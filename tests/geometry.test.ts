@@ -5,6 +5,7 @@ import {
   isPlanWallAnchor,
   normalizePlan,
   planToSvgView,
+  scalePlanWallToLength,
   wallLength,
 } from "@/lib/geometry";
 
@@ -19,6 +20,38 @@ describe("geometry", () => {
 
   it("computes wall length", () => {
     expect(wallLength({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
+  });
+
+  it("scales plan_wall anchors to a new length", () => {
+    const scaled = scalePlanWallToLength(
+      { x0: 0, y0: 0, x1: 4, y1: 0 },
+      2,
+    );
+    expect(scaled.x0).toBe(0);
+    expect(scaled.y0).toBe(0);
+    expect(scaled.x1).toBeCloseTo(2);
+    expect(scaled.y1).toBeCloseTo(0);
+    expect(
+      wallLength(
+        { x: scaled.x0, y: scaled.y0 },
+        { x: scaled.x1, y: scaled.y1 },
+      ),
+    ).toBeCloseTo(2);
+
+    const diagonal = scalePlanWallToLength(
+      { x0: 0, y0: 0, x1: 3, y1: 4 },
+      10,
+    );
+    expect(
+      wallLength(
+        { x: diagonal.x0, y: diagonal.y0 },
+        { x: diagonal.x1, y: diagonal.y1 },
+      ),
+    ).toBeCloseTo(10);
+
+    expect(() =>
+      scalePlanWallToLength({ x0: 0, y0: 0, x1: 1, y1: 0 }, 0),
+    ).toThrow(/positive/);
   });
 
   it("validates plan_wall anchors", () => {

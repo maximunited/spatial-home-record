@@ -277,8 +277,24 @@ export function buildPictureElementsYaml(input: {
     `    cards:`,
   ].join("\n");
 
-  const cardYaml = indentYaml(card, 3);
-  return `${header}\n${cardYaml}\n`;
+  // Lovelace expects `cards:` to be a sequence; emit one list item.
+  const cardYaml = indentYaml(card, 4);
+  const [firstLine, ...restLines] = cardYaml.split("\n");
+  const listItem =
+    firstLine === undefined
+      ? ""
+      : [firstLine.replace(/^ {8}/, "      - "), ...restLines].join("\n");
+  return `${header}\n${listItem}\n`;
+}
+
+/** Reject HA entity ids that look like credential material. */
+export function haEntityIdLooksLikeCredential(haEntityId: string): boolean {
+  const lower = haEntityId.toLowerCase();
+  return (
+    lower.includes("token") ||
+    lower.includes("password") ||
+    lower.includes("authorization")
+  );
 }
 
 export function overlayScreenPositions(

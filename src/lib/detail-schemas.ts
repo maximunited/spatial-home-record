@@ -199,6 +199,29 @@ export function sectionsForEntity(entity: {
   return DETAIL_SECTIONS.filter((s) => s.match(entity));
 }
 
+/** Geometry attributes that must be strictly positive when set. */
+export const POSITIVE_GEOMETRY_KEYS = new Set([
+  "plan_width",
+  "plan_depth",
+  "ceiling_height",
+  "length",
+  "height",
+  "thickness",
+  "width",
+]);
+
+/** Throw if a positive-geometry key is set to a non-positive number. */
+export function assertPositiveGeometryValue(
+  key: string,
+  value: unknown,
+): void {
+  if (!POSITIVE_GEOMETRY_KEYS.has(key)) return;
+  if (value === null || value === undefined) return;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new Error(`${key} must be a positive number`);
+  }
+}
+
 export function parseFieldValue(
   kind: DetailFieldKind,
   raw: string,

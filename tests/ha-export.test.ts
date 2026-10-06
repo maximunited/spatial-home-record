@@ -3,6 +3,7 @@ import {
   buildHaExportPackage,
   buildPictureElementsYaml,
   buildZipStore,
+  haEntityIdLooksLikeCredential,
   renderIsometricSvg,
   resolveCamera,
 } from "@/lib/ha-export";
@@ -94,6 +95,38 @@ describe("ha-export", () => {
     expect(yaml).not.toContain("token");
     expect(yaml).not.toContain("password");
     expect(yaml).toContain("Blind/fan animations are stubs");
+  });
+
+  it("emits cards as a YAML sequence with one picture-elements item", () => {
+    const yaml = buildPictureElementsYaml({
+      title: "Living Room Isometric",
+      imagePath: "/local/spatial-home-record/isometric.svg",
+      mappings: [
+        {
+          entityId: light.id,
+          haEntityId: "light.living_room_ceiling",
+        },
+      ],
+      overlayPositions: new Map([
+        [light.id, { left: "40%", top: "30%" }],
+      ]),
+    });
+    expect(yaml).toMatch(/cards:\n\s+- type: picture-elements/);
+    expect(yaml).toMatch(/^\s+- type: picture-elements$/m);
+    // Continuation keys under the list item (not a bare mapping under cards)
+    expect(yaml).toMatch(/^\s{8}image:/m);
+    expect(yaml).not.toMatch(/cards:\n\s+type: picture-elements/);
+  });
+
+  it("flags credential-like HA entity ids", () => {
+    expect(haEntityIdLooksLikeCredential("light.living_room")).toBe(false);
+    expect(haEntityIdLooksLikeCredential("sensor.api_token")).toBe(true);
+    expect(haEntityIdLooksLikeCredential("input_text.password_hint")).toBe(
+      true,
+    );
+    expect(
+      haEntityIdLooksLikeCredential("sensor.authorization_code"),
+    ).toBe(true);
   });
 
   it("packages zip with manifest and assets", () => {

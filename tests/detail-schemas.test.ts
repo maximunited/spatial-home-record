@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertPositiveGeometryValue,
   parseFieldValue,
   sectionsForEntity,
 } from "@/lib/detail-schemas";
@@ -32,5 +33,21 @@ describe("detail-schemas", () => {
     expect(parseFieldValue("json", '{"a":1}')).toEqual({ a: 1 });
     expect(parseFieldValue("text", "  hello ")).toBe("hello");
     expect(() => parseFieldValue("number", "nope")).toThrow(/Invalid number/);
+  });
+
+  it("requires positive numbers for geometry dimensions", () => {
+    expect(() => assertPositiveGeometryValue("plan_width", 4.2)).not.toThrow();
+    expect(() => assertPositiveGeometryValue("plan_depth", 0)).toThrow(
+      /positive/,
+    );
+    expect(() => assertPositiveGeometryValue("ceiling_height", -1)).toThrow(
+      /positive/,
+    );
+    expect(() => assertPositiveGeometryValue("length", 0)).toThrow(/positive/);
+    expect(() => assertPositiveGeometryValue("width", -0.5)).toThrow(
+      /positive/,
+    );
+    expect(() => assertPositiveGeometryValue("height", null)).not.toThrow();
+    expect(() => assertPositiveGeometryValue("brand", 0)).not.toThrow();
   });
 });

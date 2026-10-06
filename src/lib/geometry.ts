@@ -294,3 +294,36 @@ export function isPlanWallAnchor(
     Number.isFinite(a.y1)
   );
 }
+
+/**
+ * Scale a plan_wall anchor to a new length, keeping the start point and direction.
+ * Degenerate (zero-length) walls extend along +x.
+ */
+export function scalePlanWallToLength(
+  anchor: { x0: number; y0: number; x1: number; y1: number },
+  newLength: number,
+): { kind: "plan_wall"; x0: number; y0: number; x1: number; y1: number } {
+  if (!(Number.isFinite(newLength) && newLength > 0)) {
+    throw new Error("Wall length must be a positive number");
+  }
+  const dx = anchor.x1 - anchor.x0;
+  const dy = anchor.y1 - anchor.y0;
+  const current = Math.hypot(dx, dy);
+  if (current < 1e-9) {
+    return {
+      kind: "plan_wall",
+      x0: anchor.x0,
+      y0: anchor.y0,
+      x1: anchor.x0 + newLength,
+      y1: anchor.y0,
+    };
+  }
+  const scale = newLength / current;
+  return {
+    kind: "plan_wall",
+    x0: anchor.x0,
+    y0: anchor.y0,
+    x1: anchor.x0 + dx * scale,
+    y1: anchor.y0 + dy * scale,
+  };
+}

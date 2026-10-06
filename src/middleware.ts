@@ -1,6 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 const clerkConfigured = Boolean(
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY,
@@ -14,7 +13,7 @@ export default clerkConfigured
         await auth.protect();
       }
     })
-  : function passthrough(_req: NextRequest) {
+  : function passthrough() {
       return NextResponse.next();
     };
 

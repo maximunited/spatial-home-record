@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProjectNav } from "@/components/shell";
+import { entityHref } from "@/lib/entity-href";
 import { getProject, searchEntities } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
@@ -42,13 +43,7 @@ export default async function SearchPage({
           {results.map((e) => (
             <li key={e.id}>
               <Link
-                href={
-                  e.type === "wall"
-                    ? `/projects/${id}/walls/${e.id}`
-                    : e.type === "room"
-                      ? `/projects/${id}/rooms/${e.id}`
-                      : `/projects/${id}/entities/${e.id}`
-                }
+                href={entityHref(id, e)}
                 className="block px-3 py-3 hover:bg-zinc-50"
               >
                 <div className="font-medium text-zinc-900">{e.name}</div>

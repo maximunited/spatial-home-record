@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { entityHref } from "@/lib/entity-href";
 import type { EntityTreeNode } from "@/lib/entity-tree";
 
 function NodeList({
@@ -15,12 +16,7 @@ function NodeList({
   return (
     <ul className="space-y-0.5" style={{ paddingLeft: depth ? 12 : 0 }}>
       {nodes.map((node) => {
-        const href =
-          node.type === "wall"
-            ? `/projects/${projectId}/walls/${node.id}`
-            : node.type === "room"
-              ? `/projects/${projectId}/rooms/${node.id}`
-              : `/projects/${projectId}/entities/${node.id}`;
+        const href = entityHref(projectId, node);
         const active = selectedId === node.id;
         return (
           <li key={node.id}>

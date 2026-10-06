@@ -1,0 +1,36 @@
+# Testing
+
+## Commands
+
+| Command | What it runs |
+| ------- | ------------ |
+| `npm run test:unit` | Domain + tree/search helpers (no database) |
+| `npm run test:integration` | Neon/Postgres-backed project APIs (needs `DATABASE_URL`) |
+| `npm test` | All Vitest files |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm run build` | Next.js production build |
+
+## Layout
+
+- `tests/domain.test.ts` — confidence, anchors, relationships
+- `tests/entity-tree.test.ts` — tree build, search filter, entity hrefs
+- `tests/projects.integration.test.ts` — create/scope/upsert/search against real Postgres
+
+Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so they no-op locally when the DB is unset.
+
+## CI
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
+
+1. **unit** — `lint`, `typecheck`, `test:unit`, `build`
+2. **integration** — Postgres 16 service, apply `drizzle/0000_init_spatial_schema.sql`, `test:integration`
+
+## Local integration setup
+
+```bash
+cp .env.example .env
+# set DATABASE_URL
+npx drizzle-kit push
+npm run test:integration
+```

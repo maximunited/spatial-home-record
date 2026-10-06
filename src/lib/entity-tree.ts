@@ -28,3 +28,16 @@ export function buildEntityTree(rows: EntityRow[]): EntityTreeNode[] {
 export function findFirstRoom(rows: EntityRow[]): EntityRow | null {
   return rows.find((r) => r.type === "room") ?? null;
 }
+
+export function filterEntitiesByQuery<
+  T extends { name: string; type: string; category: string | null },
+>(rows: T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter(
+    (e) =>
+      e.name.toLowerCase().includes(q) ||
+      e.type.toLowerCase().includes(q) ||
+      (e.category?.toLowerCase().includes(q) ?? false),
+  );
+}

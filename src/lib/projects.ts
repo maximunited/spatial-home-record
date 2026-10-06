@@ -11,6 +11,7 @@ import {
   relationships,
 } from "@/db/schema";
 import type { ConfidenceState } from "@/lib/confidence";
+import { filterEntitiesByQuery } from "@/lib/entity-tree";
 import type { RelationshipType } from "@/lib/relationships";
 
 export async function createProject(input: {
@@ -199,14 +200,7 @@ export async function listHaExportProfiles(projectId: string) {
 
 export async function searchEntities(projectId: string, query: string) {
   const all = await listEntitiesByProject(projectId);
-  const q = query.trim().toLowerCase();
-  if (!q) return all;
-  return all.filter(
-    (e) =>
-      e.name.toLowerCase().includes(q) ||
-      e.type.toLowerCase().includes(q) ||
-      (e.category?.toLowerCase().includes(q) ?? false),
-  );
+  return filterEntitiesByQuery(all, query);
 }
 
 export { evidence, evidenceLinks };

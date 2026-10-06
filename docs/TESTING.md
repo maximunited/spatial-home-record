@@ -4,7 +4,7 @@
 
 | Command | What it runs |
 | ------- | ------------ |
-| `npm run test:unit` | Domain + tree/search helpers (no database) |
+| `npm run test:unit` | Domain + geometry + detail schemas + HA export (no database) |
 | `npm run test:integration` | Neon/Postgres-backed project APIs (needs `DATABASE_URL`) |
 | `npm test` | All Vitest files |
 | `npm run typecheck` | `tsc --noEmit` |
@@ -15,7 +15,10 @@
 
 - `tests/domain.test.ts` — confidence, anchors, relationships
 - `tests/entity-tree.test.ts` — tree build, search filter, entity hrefs
-- `tests/projects.integration.test.ts` — create/scope/upsert/search against real Postgres
+- `tests/geometry.test.ts` — room plan, plan_wall anchors, isometric projection
+- `tests/detail-schemas.test.ts` — section matching and field parsing
+- `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package
+- `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA against real Postgres
 
 Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so they no-op locally when the DB is unset.
 
@@ -34,3 +37,10 @@ cp .env.example .env
 npx drizzle-kit push
 npm run test:integration
 ```
+
+## Manual smoke (Living Room Pilot)
+
+1. `npm run seed`
+2. Open the Living Room room hub — edit plan width/depth/ceiling, wall endpoints, openings
+3. Open Floor Tiles / TV / Socket / Media Cabinet — save detail fields with confidence
+4. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg`

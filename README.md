@@ -2,13 +2,15 @@
 
 [![ci](https://github.com/maximunited/spatial-home-record/actions/workflows/ci.yml/badge.svg)](https://github.com/maximunited/spatial-home-record/actions/workflows/ci.yml)
 
-Evidence-backed spatial home record: structured apartment entities with per-attribute confidence, evidence links, and (later) Home Assistant isometric export.
+Evidence-backed spatial home record: structured apartment entities with per-attribute confidence, calibrated plan geometry, rich detail forms, and Home Assistant Picture Elements export.
 
-## Pass 1 status
+## Status (pass 2 first chunks)
 
 - Design: [`docs/superpowers/specs/2026-10-06-spatial-home-record-design.md`](docs/superpowers/specs/2026-10-06-spatial-home-record-design.md)
 - Docs index: [`docs/README.md`](docs/README.md)
-- Next.js shell against Postgres with living-room stub seed
+- Geometry editor on room/wall hubs (walls, openings, ceiling height)
+- Detail forms for floor tiles, TV, wall tech points, cabinet inventory
+- HA export v0: fixed isometric SVG → downloadable Picture Elements package
 - CI: unit + Postgres integration
 
 ## Setup
@@ -16,7 +18,7 @@ Evidence-backed spatial home record: structured apartment entities with per-attr
 1. Copy `.env.example` to `.env` and set `DATABASE_URL` (Neon recommended).
 2. `npm install`
 3. Apply schema: `npx drizzle-kit push` **or** `psql "$DATABASE_URL" -f drizzle/0000_init_spatial_schema.sql`
-4. `npm run seed`
+4. `npm run seed` (Living Room Pilot with calibrated plan + HA mappings)
 5. `npm run dev`
 
 Clerk keys are optional; without them, routes are open for local development.
@@ -31,7 +33,7 @@ Clerk keys are optional; without them, routes are open for local development.
 | `npm test` | All tests |
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint |
-| `npm run seed` | Living-room stub project |
+| `npm run seed` | Living-room pilot project |
 | `npm run db:push` | Push Drizzle schema |
 
 ## Docs

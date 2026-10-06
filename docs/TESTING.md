@@ -16,6 +16,7 @@
 - `tests/domain.test.ts` — confidence, anchors, relationships
 - `tests/entity-tree.test.ts` — tree build, search filter, entity hrefs
 - `tests/geometry.test.ts` — room plan, plan_wall anchors, isometric projection
+- `tests/plan-underlay.test.ts` — underlay transform, primary plan pick, calibration room deep-link
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
 - `tests/detail-schemas.test.ts` — section matching and field parsing
@@ -47,3 +48,11 @@ npm run test:integration
 3. Open Floor Tiles / TV — confirm shared receipt under Documents; open Media Wall — construction vs current compare
 4. Open Socket / Media Cabinet — save detail fields with confidence
 5. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg`
+
+## Manual smoke (Apartment 54 plan underlay)
+
+1. `npm run import:apt54` (needs `DATABASE_URL` + source on `U:` or `APT54_SOURCE`)
+2. Open project → **Calibrate Living Room from Plan 1**
+3. Confirm Plan 1 image underlays the SVG; nudge opacity/scale/offset; save underlay (estimated → measured when done)
+4. Save room dims / wall endpoints against the drawing
+5. Re-import once — IDs change but Living Room + Plan 1 still resolve by name/metadata

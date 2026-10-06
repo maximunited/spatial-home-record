@@ -5,15 +5,20 @@ import {
   updateRoomPlanAction,
   updateWallGeometryAction,
 } from "@/app/actions";
+import { PlanUnderlayCanvas } from "@/components/plan-underlay-canvas";
 import { CONFIDENCE_STATES } from "@/lib/confidence";
 import {
   buildRoomScene,
   parseNumberAttr,
-  planToSvg,
-  planToSvgView,
-  pointAlongWall,
   type RoomScene,
 } from "@/lib/geometry";
+import {
+  geometryConfidenceLabel,
+  pickPrimaryPlanEvidence,
+  planUnderlayAttributeKey,
+  planUnderlayFromAttributes,
+  type PlanEvidenceCandidate,
+} from "@/lib/plan-underlay";
 
 type EntityRow = {
   id: string;
@@ -28,6 +33,7 @@ type AttrRow = {
   entityId: string;
   key: string;
   value: unknown;
+  confidence?: string;
 };
 
 export function GeometryEditor({
@@ -37,6 +43,8 @@ export function GeometryEditor({
   attributes,
   returnTo,
   selectedWallId,
+  planEvidence = [],
+  preferredEvidenceId = null,
 }: {
   projectId: string;
   roomId: string;
@@ -44,6 +52,8 @@ export function GeometryEditor({
   attributes: AttrRow[];
   returnTo: string;
   selectedWallId?: string | null;
+  planEvidence?: PlanEvidenceCandidate[];
+  preferredEvidenceId?: string | null;
 }) {
   const room = entities.find((e) => e.id === roomId);
   if (!room) {
@@ -56,6 +66,18 @@ export function GeometryEditor({
     scene.walls[0] ??
     null;
 
+  const roomAttrs = attributes.filter((a) => a.entityId === roomId);
+  const primary = pickPrimaryPlanEvidence(planEvidence);
+  const initialUnderlay = planUnderlayFromAttributes(
+    roomAttrs,
+    preferredEvidenceId ?? primary?.id ?? null,
+  );
+  const underlayAttr = roomAttrs.find(
+    (a) => a.key === planUnderlayAttributeKey(),
+  );
+  const dimConfidence =
+    roomAttrs.find((a) => a.key === "plan_width")?.confidence ?? "estimated";
+
   return (
     <div className="space-y-4">
       <div>
@@ -64,7 +86,11 @@ export function GeometryEditor({
         </h2>
         <p className="mt-1 text-sm text-zinc-600">
           Calibrated plan editor. Edits persist to entity anchors and
-          per-attribute confidence — DB remains source of truth.{" "}
+          per-attribute confidence — DB remains source of truth. Room dims:{" "}
+          <span className="font-medium text-zinc-800">
+            {geometryConfidenceLabel(dimConfidence)}
+          </span>
+          .{" "}
           <Link
             href={`/projects/${projectId}/walkthrough`}
             className="text-blue-700 hover:underline"
@@ -74,7 +100,17 @@ export function GeometryEditor({
         </p>
       </div>
 
-      <PlanSvg scene={scene} projectId={projectId} selectedWallId={selectedWall?.entityId} />
+      <PlanUnderlayCanvas
+        projectId={projectId}
+        roomId={roomId}
+        entities={entities}
+        attributes={attributes}
+        returnTo={returnTo}
+        selectedWallId={selectedWall?.entityId}
+        planEvidence={planEvidence}
+        initialUnderlay={initialUnderlay}
+        underlayConfidence={underlayAttr?.confidence ?? dimConfidence}
+      />
 
       <form
         action={updateRoomPlanAction}
@@ -120,12 +156,20 @@ export function GeometryEditor({
           Confidence
           <select
             name="confidence"
-            defaultValue="confirmed"
+            defaultValue={
+              geometryConfidenceLabel(dimConfidence) === "measured"
+                ? "confirmed"
+                : "estimated"
+            }
             className="mt-1 w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm"
           >
-            {CONFIDENCE_STATES.map((c) => (
+            <option value="confirmed">measured (confirmed)</option>
+            <option value="supported">measured (supported)</option>
+            {CONFIDENCE_STATES.filter(
+              (c) => c !== "confirmed" && c !== "supported",
+            ).map((c) => (
               <option key={c} value={c}>
-                {c}
+                {c === "estimated" ? "estimated" : c}
               </option>
             ))}
           </select>
@@ -153,7 +197,7 @@ export function GeometryEditor({
       ) : (
         <p className="text-sm text-zinc-500">
           No walls in this room yet. Re-seed the Living Room Pilot to load the
-          calibrated stub.
+          calibrated stub, or add walls after aligning the plan underlay.
         </p>
       )}
 
@@ -163,92 +207,6 @@ export function GeometryEditor({
         selectedWallId={selectedWall?.entityId}
       />
     </div>
-  );
-}
-
-function PlanSvg({
-  scene,
-  projectId,
-  selectedWallId,
-}: {
-  scene: RoomScene;
-  projectId: string;
-  selectedWallId?: string;
-}) {
-  const view = planToSvgView(scene.plan);
-  const floor = [
-    planToSvg({ x: 0, y: 0 }, view),
-    planToSvg({ x: scene.plan.width, y: 0 }, view),
-    planToSvg({ x: scene.plan.width, y: scene.plan.depth }, view),
-    planToSvg({ x: 0, y: scene.plan.depth }, view),
-  ];
-
-  return (
-    <svg
-      viewBox={`0 0 ${view.width} ${view.height}`}
-      className="w-full max-w-xl rounded border border-zinc-200 bg-white"
-      role="img"
-      aria-label="Room plan"
-    >
-      <polygon
-        points={floor.map((p) => `${p.x},${p.y}`).join(" ")}
-        fill="#f4f4f5"
-        stroke="#a1a1aa"
-        strokeWidth={1}
-      />
-      {scene.walls.map((wall) => {
-        const a = planToSvg(wall.start, view);
-        const b = planToSvg(wall.end, view);
-        const selected = wall.entityId === selectedWallId;
-        return (
-          <g key={wall.entityId}>
-            <a href={`/projects/${projectId}/walls/${wall.entityId}`}>
-              <line
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={selected ? "#18181b" : "#52525b"}
-                strokeWidth={selected ? 5 : 3}
-                strokeLinecap="round"
-              />
-            </a>
-            <text
-              x={(a.x + b.x) / 2}
-              y={(a.y + b.y) / 2 - 8}
-              textAnchor="middle"
-              className="fill-zinc-500"
-              fontSize={10}
-            >
-              {wall.name}
-            </text>
-          </g>
-        );
-      })}
-      {scene.openings.map((op) => {
-        const wall = scene.walls.find((w) => w.entityId === op.wallEntityId);
-        if (!wall) return null;
-        const p = pointAlongWall(wall, op.u + op.width / 2);
-        const s = planToSvg(p, view);
-        return (
-          <circle
-            key={op.entityId}
-            cx={s.x}
-            cy={s.y}
-            r={6}
-            fill={op.openingType === "window" ? "#38bdf8" : "#a78bfa"}
-            stroke="#18181b"
-            strokeWidth={1}
-          >
-            <title>{op.name}</title>
-          </circle>
-        );
-      })}
-      <text x={12} y={18} fontSize={11} className="fill-zinc-500">
-        {scene.plan.width.toFixed(2)}m × {scene.plan.depth.toFixed(2)}m · H{" "}
-        {scene.plan.ceilingHeight.toFixed(2)}m
-      </text>
-    </svg>
   );
 }
 

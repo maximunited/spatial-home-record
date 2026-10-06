@@ -7,6 +7,10 @@ import { WallPhotoCompare } from "@/components/wall-photo-compare";
 import { buildEntityTree } from "@/lib/entity-tree";
 import { listProjectDocuments } from "@/lib/documents";
 import {
+  pickPrimaryPlanEvidence,
+  toPlanEvidenceCandidates,
+} from "@/lib/plan-underlay";
+import {
   getEntityBundle,
   getProject,
   listAttributesForEntities,
@@ -45,6 +49,13 @@ export default async function WallPage({
   const projectDocuments = await listProjectDocuments(id);
   const evidenceRows = await listEvidenceForEntity(wallId, id);
   const phasePair = pickPhasePhotos(evidenceRows);
+  const roomPlanEvidence = roomId
+    ? toPlanEvidenceCandidates(
+        await listEvidenceForEntity(roomId, id),
+      ).filter((e) => e.type === "plan" && e.publicUrl)
+    : [];
+  const preferredEvidenceId =
+    pickPrimaryPlanEvidence(roomPlanEvidence)?.id ?? null;
 
   return (
     <div>
@@ -74,6 +85,8 @@ export default async function WallPage({
                 attributes={attributes}
                 returnTo={returnTo}
                 selectedWallId={wallId}
+                planEvidence={roomPlanEvidence}
+                preferredEvidenceId={preferredEvidenceId}
               />
             ) : (
               <p className="text-sm text-zinc-500">Wall has no parent room.</p>

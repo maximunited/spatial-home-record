@@ -4,12 +4,18 @@ import { EntityTree } from "@/components/entity-tree";
 import { GeometryEditor } from "@/components/geometry-editor";
 import { ProjectNav, ThreePane } from "@/components/shell";
 import { listProjectDocuments } from "@/lib/documents";
-import { buildEntityTree, findFirstRoom } from "@/lib/entity-tree";
+import { buildEntityTree } from "@/lib/entity-tree";
+import {
+  findCalibrationRoom,
+  pickPrimaryPlanEvidence,
+  toPlanEvidenceCandidates,
+} from "@/lib/plan-underlay";
 import {
   getEntityBundle,
   getProject,
   listAttributesForEntities,
   listEntitiesByProject,
+  listEvidenceForEntity,
 } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +34,18 @@ export default async function EntityPage({
 
   const entityRows = await listEntitiesByProject(id);
   const tree = buildEntityTree(entityRows);
-  const room = findFirstRoom(entityRows);
+  const room = findCalibrationRoom(entityRows);
   const attributes = await listAttributesForEntities(
     entityRows.map((e) => e.id),
   );
   const returnTo = `/projects/${id}/entities/${entityId}`;
   const projectDocuments = await listProjectDocuments(id);
+  const planEvidence = room
+    ? toPlanEvidenceCandidates(
+        await listEvidenceForEntity(room.id, id),
+      ).filter((e) => e.type === "plan" && e.publicUrl)
+    : [];
+  const preferredEvidenceId = pickPrimaryPlanEvidence(planEvidence)?.id ?? null;
   const showPlan =
     bundle.entity.type === "opening" ||
     bundle.entity.type === "finish_region" ||
@@ -71,6 +83,8 @@ export default async function EntityPage({
                 entities={entityRows}
                 attributes={attributes}
                 returnTo={returnTo}
+                planEvidence={planEvidence}
+                preferredEvidenceId={preferredEvidenceId}
               />
             </div>
           ) : (

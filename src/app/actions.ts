@@ -24,6 +24,10 @@ import {
   type HaMapping,
 } from "@/lib/ha-export";
 import {
+  normalizePlanUnderlayTransform,
+  planUnderlayAttributeKey,
+} from "@/lib/plan-underlay";
+import {
   createProject,
   getEntityBundle,
   insertEntity,
@@ -165,6 +169,48 @@ export async function updateRoomPlanAction(formData: FormData) {
     key: "ceiling_height",
     value: ceiling,
     units: "m",
+    confidence,
+    provenance: "user_entry",
+  });
+
+  revalidateProjectPaths(projectId, roomId, returnTo);
+}
+
+export async function updatePlanUnderlayAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const roomId = String(formData.get("roomId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  const evidenceId = String(formData.get("evidenceId") ?? "").trim();
+  const confidence = assertConfidenceState(
+    String(formData.get("confidence") ?? "estimated"),
+  );
+
+  const transform = normalizePlanUnderlayTransform({
+    opacity: Number(formData.get("opacity")),
+    scale: Number(formData.get("scale")),
+    offsetX: Number(formData.get("offsetX")),
+    offsetY: Number(formData.get("offsetY")),
+  });
+
+  if (!projectId || !roomId) throw new Error("Missing ids");
+  if (!evidenceId) throw new Error("Select plan evidence for the underlay");
+
+  const bundle = await getEntityBundle(roomId, { projectId });
+  if (!bundle || bundle.entity.type !== "room") {
+    throw new Error("Room not found");
+  }
+
+  await upsertAttribute({
+    entityId: roomId,
+    key: planUnderlayAttributeKey(),
+    value: {
+      evidenceId,
+      opacity: transform.opacity,
+      scale: transform.scale,
+      offsetX: transform.offsetX,
+      offsetY: transform.offsetY,
+    },
     confidence,
     provenance: "user_entry",
   });

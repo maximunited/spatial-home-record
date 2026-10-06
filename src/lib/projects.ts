@@ -15,6 +15,7 @@ import type { ConfidenceState } from "@/lib/confidence";
 import { listDocumentsForEntity } from "@/lib/documents";
 import { filterEntitiesByQuery } from "@/lib/entity-tree";
 import type { HaMapping } from "@/lib/ha-export";
+import { findCalibrationRoom } from "@/lib/plan-underlay";
 import type { RelationshipType } from "@/lib/relationships";
 
 export async function createProject(input: {
@@ -264,7 +265,7 @@ export async function updateHaExportProfile(input: {
 
 export async function findRoomForProject(projectId: string) {
   const all = await listEntitiesByProject(projectId);
-  return all.find((e) => e.type === "room") ?? null;
+  return findCalibrationRoom(all);
 }
 
 export async function insertRelationship(input: {

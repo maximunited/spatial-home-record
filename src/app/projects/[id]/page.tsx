@@ -1,11 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProjectNav } from "@/components/shell";
-import { buildEntityTree, findFirstRoom } from "@/lib/entity-tree";
+import { buildEntityTree } from "@/lib/entity-tree";
+import {
+  findCalibrationRoom,
+  isApartment54ProjectName,
+  pickPrimaryPlanEvidence,
+  roomCalibrationHref,
+  toPlanEvidenceCandidates,
+} from "@/lib/plan-underlay";
 import {
   getProject,
   listCaptureTasks,
   listEntitiesByProject,
+  listEvidenceForEntity,
 } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +28,27 @@ export default async function ProjectPage({
   if (!project) notFound();
 
   const entityRows = await listEntitiesByProject(id);
-  const room = findFirstRoom(entityRows);
+  const room = findCalibrationRoom(entityRows);
   const tasks = await listCaptureTasks(id);
   const tree = buildEntityTree(entityRows);
+
+  let calibrateHref: string | null = null;
+  let calibrateLabel = room ? `Open ${room.name}` : null;
+  if (room) {
+    const evidenceRows = await listEvidenceForEntity(room.id, id);
+    const plans = toPlanEvidenceCandidates(evidenceRows).filter(
+      (e) => e.type === "plan" && e.publicUrl,
+    );
+    const primary = pickPrimaryPlanEvidence(plans);
+    calibrateHref = roomCalibrationHref(id, room.id, primary?.id);
+    if (primary && isApartment54ProjectName(project.name)) {
+      calibrateLabel = `Calibrate ${room.name} from Plan 1`;
+    } else if (primary) {
+      calibrateLabel = `Calibrate ${room.name} (plan underlay)`;
+    }
+  }
+
+  const rooms = entityRows.filter((e) => e.type === "room");
 
   return (
     <div>
@@ -61,20 +87,36 @@ export default async function ProjectPage({
 
         <div className="mt-8">
           <h3 className="font-medium text-zinc-900">Rooms</h3>
-          {room ? (
+          {calibrateHref && calibrateLabel ? (
             <Link
-              href={`/projects/${id}/rooms/${room.id}`}
+              href={calibrateHref}
               className="mt-2 inline-block rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm hover:bg-zinc-100"
             >
-              Open {room.name}
+              {calibrateLabel}
             </Link>
           ) : (
             <p className="mt-2 text-sm text-zinc-500">
               No rooms yet. Run{" "}
               <code className="font-mono">npm run seed</code> for the living-room
-              stub.
+              stub, or{" "}
+              <code className="font-mono">npm run import:apt54</code> for
+              Apartment 54.
             </p>
           )}
+          {rooms.length > 1 ? (
+            <ul className="mt-3 space-y-1 text-sm text-zinc-700">
+              {rooms.map((r) => (
+                <li key={r.id}>
+                  <Link
+                    href={roomCalibrationHref(id, r.id)}
+                    className="hover:underline"
+                  >
+                    {r.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         <div className="mt-8">

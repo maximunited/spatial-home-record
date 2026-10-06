@@ -50,6 +50,8 @@ type AssetSpec = {
   linkTo: string;
   phase?: PhotoPhase;
   merchant?: string;
+  /** Mark as primary plan underlay for geometry calibration */
+  primaryPlan?: boolean;
 };
 
 /** Curated pilot set — keep small; expand later via UI uploads. */
@@ -60,6 +62,7 @@ const ASSETS: AssetSpec[] = [
     type: "plan",
     summary: "Living room plan (full) — primary calibration candidate",
     linkTo: "living",
+    primaryPlan: true,
   },
   {
     rel: "Apartment plans\\Plan 3 - 29.5.2016.jpg",
@@ -464,6 +467,7 @@ async function main() {
   let evidenceCount = 0;
   let documentCount = 0;
   let bytesCopied = 0;
+  let primaryPlanEvidenceId: string | null = null;
 
   for (const asset of ASSETS) {
     const sourceAbs = path.join(sourceRoot, asset.rel);
@@ -489,6 +493,9 @@ async function main() {
           metadata: {
             source_rel: asset.rel.replace(/\\/g, "/"),
             import: "apt54",
+            ...(asset.primaryPlan
+              ? { role: "primary_plan", primary_calibration: true }
+              : {}),
             ...(asset.phase ? { phase: asset.phase, subject: "media_wall" } : {}),
           },
         })
@@ -503,6 +510,9 @@ async function main() {
           evidenceId: row.id,
           entityId: mediaWall.id,
         });
+      }
+      if (asset.primaryPlan) {
+        primaryPlanEvidenceId = row.id;
       }
       evidenceCount++;
       console.log(`evidence ${evidenceType}: ${storageKey}`);
@@ -531,6 +541,26 @@ async function main() {
     }
   }
 
+  if (primaryPlanEvidenceId) {
+    await upsertAttribute({
+      entityId: living.id,
+      key: "plan_underlay",
+      value: {
+        evidenceId: primaryPlanEvidenceId,
+        opacity: 0.45,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      },
+      confidence: "estimated",
+      provenance: "import_stub_pending_calibration",
+    });
+  }
+
+  const calibratePath = primaryPlanEvidenceId
+    ? `/projects/${project.id}/rooms/${living.id}?evidence=${primaryPlanEvidenceId}`
+    : `/projects/${project.id}/rooms/${living.id}`;
+
   console.log(
     JSON.stringify(
       {
@@ -541,11 +571,13 @@ async function main() {
           kitchen: kitchen.id,
           mediaWall: mediaWall.id,
         },
+        primaryPlanEvidenceId,
+        calibratePath,
         evidenceCount,
         documentCount,
         bytesCopied,
         uploadsDir: `public/uploads/${project.id}/`,
-        note: "Files are under public/uploads (gitignored). Calibrate living-room geometry from Plan 1 evidence.",
+        note: "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
       },
       null,
       2,

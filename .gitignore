@@ -38,6 +38,11 @@ yarn-error.log*
 /public/uploads/**
 !/public/uploads/.gitkeep
 
+# personal apartment / private media — never commit
+*.p12
+/public/imports/**
+!/public/imports/.gitkeep
+
 # vercel
 .vercel
 

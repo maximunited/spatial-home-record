@@ -16,7 +16,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed": "tsx scripts/seed-living-room-stub.ts"
+    "seed": "tsx scripts/seed-living-room-stub.ts",
+    "import:apt54": "tsx scripts/import-apartment-54.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",

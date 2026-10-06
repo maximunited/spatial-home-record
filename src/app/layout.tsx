@@ -18,7 +18,11 @@ export const metadata: Metadata = {
     "Evidence-backed spatial home record with confidence-labeled entities",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="en"

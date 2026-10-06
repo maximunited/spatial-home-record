@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { DetailPanel } from "@/components/detail-panel";
 import { EntityTree } from "@/components/entity-tree";
+import { GeometryEditor } from "@/components/geometry-editor";
 import { ProjectNav, ThreePane } from "@/components/shell";
-import { buildEntityTree } from "@/lib/entity-tree";
+import { buildEntityTree, findFirstRoom } from "@/lib/entity-tree";
 import {
   getEntityBundle,
   getProject,
+  listAttributesForEntities,
   listEntitiesByProject,
 } from "@/lib/projects";
 
@@ -25,6 +27,17 @@ export default async function EntityPage({
 
   const entityRows = await listEntitiesByProject(id);
   const tree = buildEntityTree(entityRows);
+  const room = findFirstRoom(entityRows);
+  const attributes = await listAttributesForEntities(
+    entityRows.map((e) => e.id),
+  );
+  const returnTo = `/projects/${id}/entities/${entityId}`;
+  const showPlan =
+    bundle.entity.type === "opening" ||
+    bundle.entity.type === "finish_region" ||
+    bundle.entity.type === "technical_point" ||
+    bundle.entity.type === "appliance" ||
+    bundle.entity.type === "built_in";
 
   return (
     <div>
@@ -39,20 +52,40 @@ export default async function EntityPage({
           </>
         }
         center={
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900">
-              {bundle.entity.name}
-            </h2>
-            <p className="mt-2 text-sm text-zinc-600">
-              Context pane for {bundle.entity.type}. Visual selection highlight
-              will sync here once the viewer ships.
-            </p>
-            <div className="mt-6 flex h-64 items-center justify-center rounded border border-dashed border-zinc-300 bg-zinc-50 text-sm text-zinc-500">
-              Selected entity: {bundle.entity.id}
+          showPlan && room ? (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-900">
+                  {bundle.entity.name}
+                </h2>
+                <p className="mt-1 text-sm text-zinc-600">
+                  Edit rich details in the right panel. Plan context below for
+                  spatial orientation.
+                </p>
+              </div>
+              <GeometryEditor
+                projectId={id}
+                roomId={room.id}
+                entities={entityRows}
+                attributes={attributes}
+                returnTo={returnTo}
+              />
             </div>
-          </div>
+          ) : (
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900">
+                {bundle.entity.name}
+              </h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Context pane for {bundle.entity.type}. Use the detail forms to
+                edit properties with per-attribute confidence.
+              </p>
+            </div>
+          )
         }
-        right={<DetailPanel bundle={bundle} />}
+        right={
+          <DetailPanel bundle={bundle} projectId={id} returnTo={returnTo} />
+        }
       />
     </div>
   );

@@ -1,9 +1,26 @@
+import { DetailForms } from "@/components/detail-forms";
+import { sectionsForEntity } from "@/lib/detail-schemas";
+import type { ConfidenceState } from "@/lib/confidence";
 import type { getEntityBundle } from "@/lib/projects";
 
 type Bundle = NonNullable<Awaited<ReturnType<typeof getEntityBundle>>>;
 
-export function DetailPanel({ bundle }: { bundle: Bundle }) {
+export function DetailPanel({
+  bundle,
+  projectId,
+  returnTo,
+}: {
+  bundle: Bundle;
+  projectId: string;
+  returnTo: string;
+}) {
   const { entity, attributes, relationships } = bundle;
+  const schemaSections = sectionsForEntity(entity);
+  const schemaKeys = new Set(
+    schemaSections.flatMap((s) => s.fields.map((f) => f.key)),
+  );
+  // Attributes not covered by a rich form section still show in Properties
+  const orphanAttrs = attributes.filter((a) => !schemaKeys.has(a.key));
 
   return (
     <div className="space-y-4 text-sm">
@@ -16,11 +33,24 @@ export function DetailPanel({ bundle }: { bundle: Bundle }) {
         <p className="mt-1 font-mono text-xs text-zinc-400">{entity.id}</p>
       </section>
 
-      {attributes.length > 0 ? (
+      <DetailForms
+        projectId={projectId}
+        entity={entity}
+        attributes={attributes.map((a) => ({
+          key: a.key,
+          value: a.value,
+          units: a.units,
+          confidence: a.confidence as ConfidenceState,
+          provenance: a.provenance,
+        }))}
+        returnTo={returnTo}
+      />
+
+      {orphanAttrs.length > 0 ? (
         <section>
-          <h3 className="mb-2 font-medium text-zinc-800">Properties</h3>
+          <h3 className="mb-2 font-medium text-zinc-800">Other properties</h3>
           <ul className="space-y-2">
-            {attributes.map((a) => (
+            {orphanAttrs.map((a) => (
               <li
                 key={a.id}
                 className="rounded border border-zinc-200 bg-white px-2 py-1.5"

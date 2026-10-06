@@ -45,7 +45,9 @@ export default async function SearchPage({
                 href={
                   e.type === "wall"
                     ? `/projects/${id}/walls/${e.id}`
-                    : `/projects/${id}/entities/${e.id}`
+                    : e.type === "room"
+                      ? `/projects/${id}/rooms/${e.id}`
+                      : `/projects/${id}/entities/${e.id}`
                 }
                 className="block px-3 py-3 hover:bg-zinc-50"
               >

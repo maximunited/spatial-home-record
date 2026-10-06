@@ -20,7 +20,7 @@ export default async function WallPage({
   const project = await getProject(id);
   if (!project) notFound();
 
-  const bundle = await getEntityBundle(wallId);
+  const bundle = await getEntityBundle(wallId, { projectId: id });
   if (!bundle || bundle.entity.type !== "wall") notFound();
 
   const entityRows = await listEntitiesByProject(id);

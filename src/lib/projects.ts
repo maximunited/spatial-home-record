@@ -56,7 +56,10 @@ export async function listEntitiesByProject(projectId: string) {
     .orderBy(asc(entities.name));
 }
 
-export async function getEntityBundle(entityId: string) {
+export async function getEntityBundle(
+  entityId: string,
+  options?: { projectId?: string },
+) {
   const db = getDb();
   const [entity] = await db
     .select()
@@ -64,6 +67,9 @@ export async function getEntityBundle(entityId: string) {
     .where(eq(entities.id, entityId))
     .limit(1);
   if (!entity) return null;
+  if (options?.projectId && entity.projectId !== options.projectId) {
+    return null;
+  }
 
   const attrs = await db
     .select()
@@ -95,6 +101,18 @@ export async function insertEntity(input: {
   spatialAnchor?: Record<string, unknown> | null;
 }) {
   const db = getDb();
+  if (input.parentId) {
+    const [parent] = await db
+      .select()
+      .from(entities)
+      .where(eq(entities.id, input.parentId))
+      .limit(1);
+    if (!parent || parent.projectId !== input.projectId) {
+      throw new Error(
+        "parentId must reference an entity in the same project",
+      );
+    }
+  }
   const [row] = await db
     .insert(entities)
     .values({

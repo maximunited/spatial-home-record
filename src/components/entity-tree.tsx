@@ -18,7 +18,9 @@ function NodeList({
         const href =
           node.type === "wall"
             ? `/projects/${projectId}/walls/${node.id}`
-            : `/projects/${projectId}/entities/${node.id}`;
+            : node.type === "room"
+              ? `/projects/${projectId}/rooms/${node.id}`
+              : `/projects/${projectId}/entities/${node.id}`;
         const active = selectedId === node.id;
         return (
           <li key={node.id}>

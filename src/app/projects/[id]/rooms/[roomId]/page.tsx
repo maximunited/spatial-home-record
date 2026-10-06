@@ -22,10 +22,10 @@ export default async function RoomPage({
 
   const entityRows = await listEntitiesByProject(id);
   const room = entityRows.find((e) => e.id === roomId);
-  if (!room) notFound();
+  if (!room || room.type !== "room") notFound();
 
   const tree = buildEntityTree(entityRows);
-  const bundle = await getEntityBundle(roomId);
+  const bundle = await getEntityBundle(roomId, { projectId: id });
 
   return (
     <div>

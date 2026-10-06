@@ -4,7 +4,18 @@ import { listProjects } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+const ACTION_ERRORS: Record<string, string> = {
+  database: "Database is not configured. Set DATABASE_URL in .env before creating a project.",
+  name: "Project name is required.",
+  create: "Could not create the project. Check DATABASE_URL and try again.",
+};
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   let projects: Awaited<ReturnType<typeof listProjects>> = [];
   let dbError: string | null = null;
   try {
@@ -12,6 +23,10 @@ export default async function HomePage() {
   } catch (e) {
     dbError = e instanceof Error ? e.message : "Database unavailable";
   }
+
+  const actionError =
+    error && ACTION_ERRORS[error] ? ACTION_ERRORS[error] : null;
+  const createDisabled = Boolean(dbError) || !process.env.DATABASE_URL;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -28,6 +43,12 @@ export default async function HomePage() {
           Database not connected: {dbError}. Set{" "}
           <code className="font-mono">DATABASE_URL</code> in{" "}
           <code className="font-mono">.env</code>.
+        </p>
+      ) : null}
+
+      {actionError ? (
+        <p className="mt-6 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+          {actionError}
         </p>
       ) : null}
 
@@ -58,20 +79,26 @@ export default async function HomePage() {
 
       <section className="mt-8 rounded border border-zinc-200 bg-zinc-50 p-4">
         <h2 className="font-medium text-zinc-900">Create project</h2>
-        <form action={createProjectAction} className="mt-3 flex gap-2">
-          <input
-            name="name"
-            required
-            placeholder="Apartment name"
-            className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-          >
-            Create
-          </button>
-        </form>
+        {createDisabled ? (
+          <p className="mt-3 text-sm text-zinc-500">
+            Connect a database before creating a project.
+          </p>
+        ) : (
+          <form action={createProjectAction} className="mt-3 flex gap-2">
+            <input
+              name="name"
+              required
+              placeholder="Apartment name"
+              className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+            >
+              Create
+            </button>
+          </form>
+        )}
       </section>
     </div>
   );

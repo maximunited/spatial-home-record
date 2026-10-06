@@ -20,7 +20,7 @@ export default async function EntityPage({
   const project = await getProject(id);
   if (!project) notFound();
 
-  const bundle = await getEntityBundle(entityId);
+  const bundle = await getEntityBundle(entityId, { projectId: id });
   if (!bundle) notFound();
 
   const entityRows = await listEntitiesByProject(id);

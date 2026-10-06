@@ -10,8 +10,8 @@ Source of truth is Postgres (Neon or local; CI uses Postgres 16). The app connec
 | `entities` | Typed hierarchy nodes + optional spatial anchor JSON |
 | `entity_attributes` | Key/value with **per-attribute** confidence |
 | `evidence` / `evidence_links` | Plans, photos, measurements, confirmations |
-| `blobs` | Object-storage pointers (uploads later) |
-| `documents` / `document_links` | Receipts, manuals, invoices |
+| `blobs` | Object-storage pointers — MVP writes under `public/` (see [BLOB-STORAGE.md](BLOB-STORAGE.md)) |
+| `documents` / `document_links` | Receipts, manuals, invoices (many entities per document) |
 | `relationships` | Typed edges (`powered_by`, `stored_inside`, …) |
 | `measurements` | Dimension values with endpoints |
 | `capture_tasks` | Guided capture checklist items |
@@ -79,6 +79,13 @@ Rich editable forms (empty generic sections stay hidden; schema-matched sections
 | Cabinet / storage | `built_in` / `shelf` / `container` / `inventory_item` |
 | Room plan | `room` |
 | Opening | `opening` |
+
+## Documents & evidence photos (pass 2)
+
+- Document types: `receipt | warranty | manual | invoice | other`
+- Detail panel lists documents linked to the entity (section hidden when empty); attach form + link-existing always available
+- Wall workspace compare uses photo evidence with `metadata.phase` of `construction` or `current`
+- Seed Living Room Pilot: one receipt linked to TV + floor tiles; media wall has construction + current SVG evidence under `public/seed/`
 
 ## HA export profiles
 

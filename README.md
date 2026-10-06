@@ -12,6 +12,8 @@ Evidence-backed spatial home record: structured apartment entities with per-attr
 - Detail forms for floor tiles, TV, wall tech points, cabinet inventory
 - HA export v0: fixed isometric SVG → downloadable Picture Elements package
 - **3D walkthrough** — React Three Fiber orbit/walk viewer from parametric plan geometry; mesh selection opens detail panel; photo hotspots; link to top-down geometry editor
+- **Documents / receipts** — attach and multi-link receipts to entities; local `public/uploads` blobs (no AWS); seed receipt on TV + floor tiles
+- **Wall photo compare** — construction vs current evidence on wall workspace
 - CI: unit + Postgres integration
 
 ## Setup

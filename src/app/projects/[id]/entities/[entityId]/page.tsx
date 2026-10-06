@@ -3,6 +3,7 @@ import { DetailPanel } from "@/components/detail-panel";
 import { EntityTree } from "@/components/entity-tree";
 import { GeometryEditor } from "@/components/geometry-editor";
 import { ProjectNav, ThreePane } from "@/components/shell";
+import { listProjectDocuments } from "@/lib/documents";
 import { buildEntityTree, findFirstRoom } from "@/lib/entity-tree";
 import {
   getEntityBundle,
@@ -32,6 +33,7 @@ export default async function EntityPage({
     entityRows.map((e) => e.id),
   );
   const returnTo = `/projects/${id}/entities/${entityId}`;
+  const projectDocuments = await listProjectDocuments(id);
   const showPlan =
     bundle.entity.type === "opening" ||
     bundle.entity.type === "finish_region" ||
@@ -84,7 +86,12 @@ export default async function EntityPage({
           )
         }
         right={
-          <DetailPanel bundle={bundle} projectId={id} returnTo={returnTo} />
+          <DetailPanel
+            bundle={bundle}
+            projectId={id}
+            returnTo={returnTo}
+            projectDocuments={projectDocuments}
+          />
         }
       />
     </div>

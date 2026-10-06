@@ -4,6 +4,7 @@ import { DetailPanel } from "@/components/detail-panel";
 import { EntityTree } from "@/components/entity-tree";
 import { ProjectNav, ThreePane } from "@/components/shell";
 import { WalkthroughShell } from "@/components/walkthrough-shell";
+import { listProjectDocuments } from "@/lib/documents";
 import { buildEntityTree } from "@/lib/entity-tree";
 import { buildWalkthroughScene } from "@/lib/walkthrough-scene";
 import {
@@ -64,6 +65,7 @@ export default async function WalkthroughPage({
   const returnTo = selectedEntityId
     ? `/projects/${id}/walkthrough?entity=${selectedEntityId}`
     : `/projects/${id}/walkthrough`;
+  const projectDocuments = await listProjectDocuments(id);
 
   const bundle =
     selectedEntityId != null
@@ -118,6 +120,7 @@ export default async function WalkthroughPage({
               bundle={bundle}
               projectId={id}
               returnTo={returnTo}
+              projectDocuments={projectDocuments}
             />
           ) : (
             <p className="text-sm text-zinc-500">

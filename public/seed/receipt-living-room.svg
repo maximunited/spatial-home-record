@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640" role="img" aria-label="Demo receipt placeholder">
+  <rect width="480" height="640" fill="#faf8f5"/>
+  <rect x="24" y="24" width="432" height="592" fill="#fff" stroke="#ccc" stroke-width="1"/>
+  <text x="240" y="70" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#222">Example Home Store</text>
+  <text x="240" y="100" text-anchor="middle" font-family="ui-monospace, monospace" font-size="12" fill="#666">RECEIPT · INV-HOME-2024-042</text>
+  <line x1="48" y1="120" x2="432" y2="120" stroke="#ddd"/>
+  <text x="48" y="160" font-family="ui-monospace, monospace" font-size="13" fill="#333">55" OLED TV (EXAMPLE-55OLED)</text>
+  <text x="432" y="160" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#333">1,299.00</text>
+  <text x="48" y="190" font-family="ui-monospace, monospace" font-size="13" fill="#333">Matte Porcelain 60×60 (12 boxes)</text>
+  <text x="432" y="190" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#333">486.00</text>
+  <line x1="48" y1="220" x2="432" y2="220" stroke="#ddd"/>
+  <text x="48" y="260" font-family="ui-monospace, monospace" font-size="14" fill="#111">TOTAL ILS</text>
+  <text x="432" y="260" text-anchor="end" font-family="ui-monospace, monospace" font-size="14" fill="#111">1,785.00</text>
+  <text x="48" y="320" font-family="Georgia, serif" font-size="12" fill="#888">Linked to Living Room TV + Floor Tiles</text>
+  <text x="48" y="580" font-family="ui-monospace, monospace" font-size="11" fill="#aaa">Seed placeholder  Spatial Home Record</text>
+</svg>

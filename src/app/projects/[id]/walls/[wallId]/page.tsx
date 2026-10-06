@@ -3,13 +3,20 @@ import { DetailPanel } from "@/components/detail-panel";
 import { EntityTree } from "@/components/entity-tree";
 import { GeometryEditor } from "@/components/geometry-editor";
 import { ProjectNav, ThreePane } from "@/components/shell";
+import { WallPhotoCompare } from "@/components/wall-photo-compare";
 import { buildEntityTree } from "@/lib/entity-tree";
+import { listProjectDocuments } from "@/lib/documents";
 import {
   getEntityBundle,
   getProject,
   listAttributesForEntities,
   listEntitiesByProject,
+  listEvidenceForEntity,
 } from "@/lib/projects";
+import {
+  canShowPhotoCompare,
+  pickPhasePhotos,
+} from "@/lib/wall-photo-compare";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +42,9 @@ export default async function WallPage({
     entityRows.map((e) => e.id),
   );
   const returnTo = `/projects/${id}/walls/${wallId}`;
+  const projectDocuments = await listProjectDocuments(id);
+  const evidenceRows = await listEvidenceForEntity(wallId, id);
+  const phasePair = pickPhasePhotos(evidenceRows);
 
   return (
     <div>
@@ -49,21 +59,34 @@ export default async function WallPage({
           </>
         }
         center={
-          roomId ? (
-            <GeometryEditor
-              projectId={id}
-              roomId={roomId}
-              entities={entityRows}
-              attributes={attributes}
-              returnTo={returnTo}
-              selectedWallId={wallId}
-            />
-          ) : (
-            <p className="text-sm text-zinc-500">Wall has no parent room.</p>
-          )
+          <div className="space-y-3">
+            {canShowPhotoCompare(phasePair) ? (
+              <WallPhotoCompare
+                construction={phasePair.construction}
+                current={phasePair.current}
+              />
+            ) : null}
+            {roomId ? (
+              <GeometryEditor
+                projectId={id}
+                roomId={roomId}
+                entities={entityRows}
+                attributes={attributes}
+                returnTo={returnTo}
+                selectedWallId={wallId}
+              />
+            ) : (
+              <p className="text-sm text-zinc-500">Wall has no parent room.</p>
+            )}
+          </div>
         }
         right={
-          <DetailPanel bundle={bundle} projectId={id} returnTo={returnTo} />
+          <DetailPanel
+            bundle={bundle}
+            projectId={id}
+            returnTo={returnTo}
+            projectDocuments={projectDocuments}
+          />
         }
       />
     </div>

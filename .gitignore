@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local MVP uploads (seed assets under public/seed/ are committed)
+/public/uploads/**
+!/public/uploads/.gitkeep
+
 # vercel
 .vercel
 

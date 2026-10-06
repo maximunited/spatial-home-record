@@ -1,4 +1,5 @@
 import { DetailForms } from "@/components/detail-forms";
+import { DocumentsSection } from "@/components/documents-section";
 import { sectionsForEntity } from "@/lib/detail-schemas";
 import type { ConfidenceState } from "@/lib/confidence";
 import type { getEntityBundle } from "@/lib/projects";
@@ -9,12 +10,19 @@ export function DetailPanel({
   bundle,
   projectId,
   returnTo,
+  projectDocuments = [],
 }: {
   bundle: Bundle;
   projectId: string;
   returnTo: string;
+  projectDocuments?: Array<{
+    id: string;
+    documentType: string;
+    merchant: string | null;
+    documentNumber: string | null;
+  }>;
 }) {
-  const { entity, attributes, relationships } = bundle;
+  const { entity, attributes, relationships, documents } = bundle;
   const schemaSections = sectionsForEntity(entity);
   const schemaKeys = new Set(
     schemaSections.flatMap((s) => s.fields.map((f) => f.key)),
@@ -73,6 +81,14 @@ export function DetailPanel({
           </ul>
         </section>
       ) : null}
+
+      <DocumentsSection
+        projectId={projectId}
+        entityId={entity.id}
+        documents={documents}
+        projectDocuments={projectDocuments}
+        returnTo={returnTo}
+      />
 
       {entity.spatialAnchor ? (
         <section>

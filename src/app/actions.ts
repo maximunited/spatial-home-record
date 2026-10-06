@@ -2,10 +2,27 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { writeLocalBlob } from "@/lib/blobs";
 import { assertConfidenceState } from "@/lib/confidence";
-import { parseFieldValue, type DetailFieldKind } from "@/lib/detail-schemas";
-import { isPlanWallAnchor, wallLength } from "@/lib/geometry";
-import type { HaMapping } from "@/lib/ha-export";
+import {
+  assertPositiveGeometryValue,
+  parseFieldValue,
+  type DetailFieldKind,
+} from "@/lib/detail-schemas";
+import {
+  createDocument,
+  isDocumentType,
+  linkDocumentToEntities,
+} from "@/lib/documents";
+import {
+  isPlanWallAnchor,
+  scalePlanWallToLength,
+  wallLength,
+} from "@/lib/geometry";
+import {
+  haEntityIdLooksLikeCredential,
+  type HaMapping,
+} from "@/lib/ha-export";
 import {
   createProject,
   getEntityBundle,
@@ -73,6 +90,23 @@ export async function upsertAttributeAction(formData: FormData) {
   if (value === null && rawValue.trim() === "") {
     // Allow clearing text/number/json by storing null
     value = null;
+  }
+
+  assertPositiveGeometryValue(key, value);
+
+  // Keep plan_wall endpoints consistent when length is edited from the detail form.
+  if (
+    key === "length" &&
+    typeof value === "number" &&
+    bundle.entity.type === "wall" &&
+    isPlanWallAnchor(bundle.entity.spatialAnchor)
+  ) {
+    const scaled = scalePlanWallToLength(bundle.entity.spatialAnchor, value);
+    await updateEntitySpatialAnchor({
+      entityId,
+      projectId,
+      spatialAnchor: scaled,
+    });
   }
 
   await upsertAttribute({
@@ -225,6 +259,9 @@ export async function updateOpeningGeometryAction(formData: FormData) {
   if (![u, width, height, sillHeight].every((n) => Number.isFinite(n))) {
     throw new Error("Opening fields must be numbers");
   }
+  if (width <= 0 || height <= 0) {
+    throw new Error("Opening width and height must be positive");
+  }
 
   const bundle = await getEntityBundle(openingId, { projectId });
   if (!bundle || bundle.entity.type !== "opening") {
@@ -367,13 +404,15 @@ export async function updateHaMappingsAction(formData: FormData) {
 
   // Never accept credential-like keys
   for (const m of mappings) {
-    const lower = m.haEntityId.toLowerCase();
-    if (
-      lower.includes("token") ||
-      lower.includes("password") ||
-      lower.includes("authorization")
-    ) {
+    if (haEntityIdLooksLikeCredential(m.haEntityId)) {
       throw new Error("HA credentials must not be stored in mappings");
+    }
+  }
+
+  for (const m of mappings) {
+    const owned = await getEntityBundle(m.entityId, { projectId });
+    if (!owned) {
+      throw new Error(`Entity ${m.entityId} not found in project`);
     }
   }
 
@@ -400,6 +439,15 @@ export async function addHaMappingAction(formData: FormData) {
     throw new Error("Missing mapping fields");
   }
 
+  if (haEntityIdLooksLikeCredential(haEntityId)) {
+    throw new Error("HA credentials must not be stored in mappings");
+  }
+
+  const owned = await getEntityBundle(entityId, { projectId });
+  if (!owned) {
+    throw new Error(`Entity ${entityId} not found in project`);
+  }
+
   const { getHaExportProfile } = await import("@/lib/projects");
   const profile = await getHaExportProfile(profileId, projectId);
   if (!profile) throw new Error("Profile not found");
@@ -424,6 +472,82 @@ export async function addHaMappingAction(formData: FormData) {
   if (returnTo) revalidatePath(returnTo);
 }
 
+export async function attachDocumentAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const entityId = String(formData.get("entityId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  const documentTypeRaw = String(formData.get("documentType") ?? "receipt");
+  const merchant = String(formData.get("merchant") ?? "").trim() || null;
+  const documentNumber =
+    String(formData.get("documentNumber") ?? "").trim() || null;
+  const currency = String(formData.get("currency") ?? "").trim() || null;
+  const totalRaw = String(formData.get("total") ?? "").trim();
+  const alsoLinkRaw = String(formData.get("alsoLinkEntityIds") ?? "");
+
+  if (!projectId || !entityId) throw new Error("Missing projectId or entityId");
+  if (!isDocumentType(documentTypeRaw)) {
+    throw new Error("Invalid document type");
+  }
+
+  const bundle = await getEntityBundle(entityId, { projectId });
+  if (!bundle) throw new Error("Entity not found in project");
+
+  let originalBlobId: string | null = null;
+  const file = formData.get("file");
+  if (file instanceof File && file.size > 0) {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const blob = await writeLocalBlob({
+      projectId,
+      filename: file.name || "document.bin",
+      bytes,
+      contentType: file.type || null,
+    });
+    originalBlobId = blob.id;
+  }
+
+  const alsoIds = alsoLinkRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  await createDocument({
+    projectId,
+    documentType: documentTypeRaw,
+    originalBlobId,
+    merchant,
+    documentNumber,
+    currency,
+    total: totalRaw === "" ? null : totalRaw,
+    linkEntityIds: [entityId, ...alsoIds],
+  });
+
+  revalidateProjectPaths(projectId, entityId, returnTo);
+}
+
+export async function linkExistingDocumentAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const entityId = String(formData.get("entityId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+
+  if (!projectId || !entityId || !documentId) {
+    throw new Error("Missing projectId, entityId, or documentId");
+  }
+
+  const bundle = await getEntityBundle(entityId, { projectId });
+  if (!bundle) throw new Error("Entity not found in project");
+
+  await linkDocumentToEntities({
+    documentId,
+    projectId,
+    entityIds: [entityId],
+  });
+
+  revalidateProjectPaths(projectId, entityId, returnTo);
+}
+
 function revalidateProjectPaths(
   projectId: string,
   entityId: string,
@@ -434,5 +558,6 @@ function revalidateProjectPaths(
   revalidatePath(`/projects/${projectId}/rooms/${entityId}`);
   revalidatePath(`/projects/${projectId}/walls/${entityId}`);
   revalidatePath(`/projects/${projectId}/export/ha`);
+  revalidatePath(`/projects/${projectId}/walkthrough`);
   if (returnTo) revalidatePath(returnTo);
 }

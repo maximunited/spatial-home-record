@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
+  blobs,
   captureTasks,
   entities,
   entityAttributes,
@@ -11,6 +12,7 @@ import {
   relationships,
 } from "@/db/schema";
 import type { ConfidenceState } from "@/lib/confidence";
+import { listDocumentsForEntity } from "@/lib/documents";
 import { filterEntitiesByQuery } from "@/lib/entity-tree";
 import type { HaMapping } from "@/lib/ha-export";
 import type { RelationshipType } from "@/lib/relationships";
@@ -87,10 +89,13 @@ export async function getEntityBundle(
     .from(relationships)
     .where(eq(relationships.toEntityId, entityId));
 
+  const docs = await listDocumentsForEntity(entityId, entity.projectId);
+
   return {
     entity,
     attributes: attrs,
     relationships: [...relsFrom, ...relsTo],
+    documents: docs,
   };
 }
 
@@ -331,6 +336,40 @@ export async function listEvidenceLinkedToEntities(
     type: r.type,
     summary: r.summary,
     entityId: r.entityId,
+  }));
+}
+
+/** Photo/plan evidence for one entity, including optional blob pointers. */
+export async function listEvidenceForEntity(
+  entityId: string,
+  projectId: string,
+) {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: evidence.id,
+      type: evidence.type,
+      summary: evidence.summary,
+      metadata: evidence.metadata,
+      storageKey: blobs.storageKey,
+      contentType: blobs.contentType,
+    })
+    .from(evidence)
+    .innerJoin(evidenceLinks, eq(evidenceLinks.evidenceId, evidence.id))
+    .leftJoin(blobs, eq(blobs.id, evidence.blobId))
+    .where(
+      and(
+        eq(evidence.projectId, projectId),
+        eq(evidenceLinks.entityId, entityId),
+      ),
+    );
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type,
+    summary: r.summary,
+    metadata: r.metadata,
+    storageKey: r.storageKey,
+    contentType: r.contentType,
   }));
 }
 

@@ -3,6 +3,7 @@ import { DetailPanel } from "@/components/detail-panel";
 import { EntityTree } from "@/components/entity-tree";
 import { GeometryEditor } from "@/components/geometry-editor";
 import { ProjectNav, ThreePane } from "@/components/shell";
+import { listProjectDocuments } from "@/lib/documents";
 import { buildEntityTree } from "@/lib/entity-tree";
 import {
   getEntityBundle,
@@ -32,6 +33,7 @@ export default async function RoomPage({
     entityRows.map((e) => e.id),
   );
   const returnTo = `/projects/${id}/rooms/${roomId}`;
+  const projectDocuments = await listProjectDocuments(id);
 
   return (
     <div>
@@ -60,6 +62,7 @@ export default async function RoomPage({
               bundle={bundle}
               projectId={id}
               returnTo={returnTo}
+              projectDocuments={projectDocuments}
             />
           ) : undefined
         }

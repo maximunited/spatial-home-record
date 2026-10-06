@@ -8,6 +8,8 @@ import {
   haExportProfiles,
   projects,
 } from "../src/db/schema";
+import { registerPublicBlob } from "../src/lib/blobs";
+import { createDocument } from "../src/lib/documents";
 import {
   insertEntity,
   insertRelationship,
@@ -371,7 +373,7 @@ async function main() {
     key: "brand",
     value: "Example Tile Co",
     confidence: "supported",
-    provenance: "receipt_link_pending",
+    provenance: "receipt",
   });
   await upsertAttribute({
     entityId: floorFinish.id,
@@ -612,23 +614,71 @@ async function main() {
     metadata: { ha_entity_id: "media_player.living_room_tv" },
   });
 
-  const [mediaWallPhoto] = await db
+  const [constructionBlob, currentBlob, receiptBlob] = await Promise.all([
+    registerPublicBlob({
+      projectId: project.id,
+      storageKey: "seed/media-wall-construction.svg",
+      contentType: "image/svg+xml",
+    }),
+    registerPublicBlob({
+      projectId: project.id,
+      storageKey: "seed/media-wall-current.svg",
+      contentType: "image/svg+xml",
+    }),
+    registerPublicBlob({
+      projectId: project.id,
+      storageKey: "seed/receipt-living-room.svg",
+      contentType: "image/svg+xml",
+    }),
+  ]);
+
+  const [constructionPhoto] = await db
     .insert(evidence)
     .values({
       projectId: project.id,
       type: "photo",
-      summary:
-        "Construction photo stub — media wall framing (blob upload pending)",
+      blobId: constructionBlob.id,
+      summary: "Media wall during framing — construction phase",
       metadata: {
-        stub: true,
+        phase: "construction",
         subject: "media_wall",
-        note: "Placeholder evidence for walkthrough hotspot; no blob stored",
+        stub: false,
       },
     })
     .returning();
-  await db.insert(evidenceLinks).values({
-    evidenceId: mediaWallPhoto.id,
-    entityId: mediaWall.id,
+  const [currentPhoto] = await db
+    .insert(evidence)
+    .values({
+      projectId: project.id,
+      type: "photo",
+      blobId: currentBlob.id,
+      summary: "Media wall finished — current phase",
+      metadata: {
+        phase: "current",
+        subject: "media_wall",
+        stub: false,
+      },
+    })
+    .returning();
+  await db.insert(evidenceLinks).values([
+    { evidenceId: constructionPhoto.id, entityId: mediaWall.id },
+    { evidenceId: currentPhoto.id, entityId: mediaWall.id },
+  ]);
+
+  await createDocument({
+    projectId: project.id,
+    documentType: "receipt",
+    originalBlobId: receiptBlob.id,
+    merchant: "Example Home Store",
+    documentDate: new Date("2024-06-15T12:00:00Z"),
+    documentNumber: "INV-HOME-2024-042",
+    currency: "ILS",
+    total: "1785.00",
+    metadata: {
+      note: "Combined TV + floor tile purchase; linked to both entities",
+      lines: ["EXAMPLE-55OLED", "Matte Porcelain 60"],
+    },
+    linkEntityIds: [tv.id, floorFinish.id],
   });
 
   await db.insert(captureTasks).values({

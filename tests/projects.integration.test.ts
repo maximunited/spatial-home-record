@@ -9,15 +9,23 @@ import {
   insertRelationship,
   listAttributesForEntities,
   listEntitiesByProject,
+  listEvidenceForEntity,
   searchEntities,
   updateEntitySpatialAnchor,
   updateHaExportProfile,
   upsertAttribute,
 } from "@/lib/projects";
+import { registerPublicBlob } from "@/lib/blobs";
+import {
+  createDocument,
+  linkDocumentToEntities,
+  listDocumentsForEntity,
+} from "@/lib/documents";
+import { pickPhasePhotos } from "@/lib/wall-photo-compare";
 import { buildRoomScene } from "@/lib/geometry";
 import { buildHaExportPackage } from "@/lib/ha-export";
 import { getDb } from "@/db/client";
-import { haExportProfiles } from "@/db/schema";
+import { evidence, evidenceLinks, haExportProfiles } from "@/db/schema";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -255,6 +263,109 @@ describe.runIf(hasDb)("projects integration", () => {
       });
       expect(pkg.pictureElementsYaml).toContain("light.test_updated");
       expect(pkg.isometricSvg).toContain("<svg");
+    },
+    30_000,
+  );
+
+  it(
+    "links one receipt document to multiple entities and phases wall photos",
+    async () => {
+      const project = await createProject({
+        name: `Docs Evidence ${Date.now()}`,
+      });
+      const tv = await insertEntity({
+        projectId: project.id,
+        type: "appliance",
+        category: "television",
+        name: "TV",
+      });
+      const tiles = await insertEntity({
+        projectId: project.id,
+        type: "finish_region",
+        category: "tile_flooring",
+        name: "Tiles",
+      });
+      const wall = await insertEntity({
+        projectId: project.id,
+        type: "wall",
+        name: "Media Wall",
+      });
+
+      const receiptBlob = await registerPublicBlob({
+        projectId: project.id,
+        storageKey: "seed/receipt-living-room.svg",
+        contentType: "image/svg+xml",
+      });
+      const doc = await createDocument({
+        projectId: project.id,
+        documentType: "receipt",
+        originalBlobId: receiptBlob.id,
+        merchant: "Test Store",
+        documentNumber: "INV-TEST",
+        currency: "ILS",
+        total: "10.00",
+        linkEntityIds: [tv.id],
+      });
+      await linkDocumentToEntities({
+        documentId: doc.id,
+        projectId: project.id,
+        entityIds: [tiles.id],
+      });
+
+      const tvDocs = await listDocumentsForEntity(tv.id, project.id);
+      const tileDocs = await listDocumentsForEntity(tiles.id, project.id);
+      expect(tvDocs).toHaveLength(1);
+      expect(tileDocs).toHaveLength(1);
+      expect(tvDocs[0]?.id).toBe(doc.id);
+      expect(tvDocs[0]?.linkedEntityIds.sort()).toEqual(
+        [tv.id, tiles.id].sort(),
+      );
+      expect(tvDocs[0]?.publicUrl).toBe("/seed/receipt-living-room.svg");
+
+      const bundle = await getEntityBundle(tv.id, { projectId: project.id });
+      expect(bundle?.documents).toHaveLength(1);
+
+      const db = getDb();
+      const constructionBlob = await registerPublicBlob({
+        projectId: project.id,
+        storageKey: "seed/media-wall-construction.svg",
+        contentType: "image/svg+xml",
+      });
+      const currentBlob = await registerPublicBlob({
+        projectId: project.id,
+        storageKey: "seed/media-wall-current.svg",
+        contentType: "image/svg+xml",
+      });
+      const [construction] = await db
+        .insert(evidence)
+        .values({
+          projectId: project.id,
+          type: "photo",
+          blobId: constructionBlob.id,
+          summary: "construction",
+          metadata: { phase: "construction" },
+        })
+        .returning();
+      const [current] = await db
+        .insert(evidence)
+        .values({
+          projectId: project.id,
+          type: "photo",
+          blobId: currentBlob.id,
+          summary: "current",
+          metadata: { phase: "current" },
+        })
+        .returning();
+      await db.insert(evidenceLinks).values([
+        { evidenceId: construction.id, entityId: wall.id },
+        { evidenceId: current.id, entityId: wall.id },
+      ]);
+
+      const wallEvidence = await listEvidenceForEntity(wall.id, project.id);
+      const pair = pickPhasePhotos(wallEvidence);
+      expect(pair.construction?.id).toBe(construction.id);
+      expect(pair.current?.id).toBe(current.id);
+      expect(pair.construction?.publicUrl).toContain("construction");
     },
     30_000,
   );

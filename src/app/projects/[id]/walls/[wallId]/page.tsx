@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { DetailPanel } from "@/components/detail-panel";
 import { EntityTree } from "@/components/entity-tree";
+import { GeometryEditor } from "@/components/geometry-editor";
 import { ProjectNav, ThreePane } from "@/components/shell";
 import { buildEntityTree } from "@/lib/entity-tree";
 import {
   getEntityBundle,
   getProject,
+  listAttributesForEntities,
   listEntitiesByProject,
 } from "@/lib/projects";
 
@@ -25,6 +27,14 @@ export default async function WallPage({
 
   const entityRows = await listEntitiesByProject(id);
   const tree = buildEntityTree(entityRows);
+  const roomId =
+    bundle.entity.parentId ??
+    entityRows.find((e) => e.type === "room")?.id ??
+    null;
+  const attributes = await listAttributesForEntities(
+    entityRows.map((e) => e.id),
+  );
+  const returnTo = `/projects/${id}/walls/${wallId}`;
 
   return (
     <div>
@@ -39,32 +49,22 @@ export default async function WallPage({
           </>
         }
         center={
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-zinc-900">
-              Wall workspace · {bundle.entity.name}
-            </h2>
-            <p className="text-sm text-zinc-600">
-              Elevation, technical overlays, and construction-vs-current photo
-              comparison land in pass 2.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                "3D room context",
-                "Orthographic elevation",
-                "Floor-plan thickness",
-                "Technical overlays",
-              ].map((label) => (
-                <div
-                  key={label}
-                  className="flex h-28 items-center justify-center rounded border border-dashed border-zinc-300 bg-zinc-50 text-xs text-zinc-500"
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-          </div>
+          roomId ? (
+            <GeometryEditor
+              projectId={id}
+              roomId={roomId}
+              entities={entityRows}
+              attributes={attributes}
+              returnTo={returnTo}
+              selectedWallId={wallId}
+            />
+          ) : (
+            <p className="text-sm text-zinc-500">Wall has no parent room.</p>
+          )
         }
-        right={<DetailPanel bundle={bundle} />}
+        right={
+          <DetailPanel bundle={bundle} projectId={id} returnTo={returnTo} />
+        }
       />
     </div>
   );

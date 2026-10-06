@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { DetailPanel } from "@/components/detail-panel";
 import { EntityTree } from "@/components/entity-tree";
+import { GeometryEditor } from "@/components/geometry-editor";
 import { ProjectNav, ThreePane } from "@/components/shell";
 import { buildEntityTree } from "@/lib/entity-tree";
 import {
   getEntityBundle,
   getProject,
+  listAttributesForEntities,
   listEntitiesByProject,
 } from "@/lib/projects";
 
@@ -26,6 +28,10 @@ export default async function RoomPage({
 
   const tree = buildEntityTree(entityRows);
   const bundle = await getEntityBundle(roomId, { projectId: id });
+  const attributes = await listAttributesForEntities(
+    entityRows.map((e) => e.id),
+  );
+  const returnTo = `/projects/${id}/rooms/${roomId}`;
 
   return (
     <div>
@@ -40,18 +46,23 @@ export default async function RoomPage({
           </>
         }
         center={
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900">{room.name}</h2>
-            <p className="mt-2 text-sm text-zinc-600">
-              Room hub — 2D/3D context arrives in pass 2. Select entities in the
-              tree to inspect evidence-backed details.
-            </p>
-            <div className="mt-6 flex h-64 items-center justify-center rounded border border-dashed border-zinc-300 bg-zinc-50 text-sm text-zinc-500">
-              Plan / elevation placeholder
-            </div>
-          </div>
+          <GeometryEditor
+            projectId={id}
+            roomId={roomId}
+            entities={entityRows}
+            attributes={attributes}
+            returnTo={returnTo}
+          />
         }
-        right={bundle ? <DetailPanel bundle={bundle} /> : undefined}
+        right={
+          bundle ? (
+            <DetailPanel
+              bundle={bundle}
+              projectId={id}
+              returnTo={returnTo}
+            />
+          ) : undefined
+        }
       />
     </div>
   );

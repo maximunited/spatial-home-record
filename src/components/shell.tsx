@@ -49,7 +49,7 @@ export function ThreePane({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto grid min-h-[70vh] max-w-7xl grid-cols-1 gap-0 border-x border-zinc-200 md:grid-cols-[240px_1fr_300px]">
+    <div className="mx-auto grid min-h-[70vh] max-w-7xl grid-cols-1 gap-0 border-x border-zinc-200 md:grid-cols-[220px_1fr_340px]">
       <aside className="border-b border-zinc-200 bg-zinc-50 p-3 md:border-b-0 md:border-r">
         {left}
       </aside>

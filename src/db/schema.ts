@@ -273,6 +273,8 @@ export const haExportProfiles = pgTable("ha_export_profiles", {
         entityId: string;
         haEntityId: string;
         actions?: Record<string, unknown>;
+        label?: string;
+        style?: Record<string, string | number>;
       }>
     >()
     .notNull()

@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Spatial Home Record
 
-## Getting Started
+Evidence-backed spatial home record: structured apartment entities with per-attribute confidence, evidence links, and (later) Home Assistant isometric export.
 
-First, run the development server:
+## Pass 1 status
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Design: `docs/superpowers/specs/2026-10-06-spatial-home-record-design.md`
+- Plan: `docs/superpowers/plans/2026-10-06-spatial-home-record-pass-1.md`
+- Next.js shell against Neon Postgres with living-room stub seed
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Copy `.env.example` to `.env` and set `DATABASE_URL` (Neon recommended).
+2. `npm install`
+3. `npx drizzle-kit push` (or `npm run db:migrate` after configuring migrations journal)
+4. `npm run seed`
+5. `npm run dev`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Clerk keys are optional; without them, routes are open for local development.
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run dev` — app
+- `npm test` — unit + integration tests
+- `npm run seed` — living-room stub project
+- `npm run db:push` — push Drizzle schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Note
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Do not commit `.env`. Home Assistant credentials must never be stored in the database or export packages.

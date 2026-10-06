@@ -64,7 +64,13 @@ export function GeometryEditor({
         </h2>
         <p className="mt-1 text-sm text-zinc-600">
           Calibrated plan editor. Edits persist to entity anchors and
-          per-attribute confidence — DB remains source of truth.
+          per-attribute confidence — DB remains source of truth.{" "}
+          <Link
+            href={`/projects/${projectId}/walkthrough`}
+            className="text-blue-700 hover:underline"
+          >
+            Open 3D walkthrough →
+          </Link>
         </p>
       </div>
 

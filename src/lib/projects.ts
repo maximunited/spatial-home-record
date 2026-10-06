@@ -304,4 +304,34 @@ export async function searchEntities(projectId: string, query: string) {
   return filterEntitiesByQuery(all, query);
 }
 
+/** Evidence rows joined to entity links (for walkthrough hotspots). */
+export async function listEvidenceLinkedToEntities(
+  projectId: string,
+  entityIds: string[],
+) {
+  if (entityIds.length === 0) return [];
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: evidence.id,
+      type: evidence.type,
+      summary: evidence.summary,
+      entityId: evidenceLinks.entityId,
+    })
+    .from(evidence)
+    .innerJoin(evidenceLinks, eq(evidenceLinks.evidenceId, evidence.id))
+    .where(
+      and(
+        eq(evidence.projectId, projectId),
+        inArray(evidenceLinks.entityId, entityIds),
+      ),
+    );
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type,
+    summary: r.summary,
+    entityId: r.entityId,
+  }));
+}
+
 export { evidence, evidenceLinks };

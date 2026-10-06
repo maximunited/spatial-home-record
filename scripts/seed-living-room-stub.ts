@@ -1,7 +1,13 @@
 import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { closeDb, getDb } from "../src/db/client";
-import { captureTasks, haExportProfiles, projects } from "../src/db/schema";
+import {
+  captureTasks,
+  evidence,
+  evidenceLinks,
+  haExportProfiles,
+  projects,
+} from "../src/db/schema";
 import {
   insertEntity,
   insertRelationship,
@@ -498,6 +504,32 @@ async function main() {
     provenance: "construction_photo",
   });
 
+  // Cabinet volume (estimated footprint for walkthrough — not surveyed)
+  await upsertAttribute({
+    entityId: cabinet.id,
+    key: "width",
+    value: 1.6,
+    units: "m",
+    confidence: "estimated",
+    provenance: "walkthrough_volume_stub",
+  });
+  await upsertAttribute({
+    entityId: cabinet.id,
+    key: "height",
+    value: 0.55,
+    units: "m",
+    confidence: "estimated",
+    provenance: "walkthrough_volume_stub",
+  });
+  await upsertAttribute({
+    entityId: cabinet.id,
+    key: "depth",
+    value: 0.45,
+    units: "m",
+    confidence: "estimated",
+    provenance: "walkthrough_volume_stub",
+  });
+
   // Cabinet inventory
   await upsertAttribute({
     entityId: cabinet.id,
@@ -578,6 +610,25 @@ async function main() {
     fromEntityId: tv.id,
     toEntityId: tv.id,
     metadata: { ha_entity_id: "media_player.living_room_tv" },
+  });
+
+  const [mediaWallPhoto] = await db
+    .insert(evidence)
+    .values({
+      projectId: project.id,
+      type: "photo",
+      summary:
+        "Construction photo stub — media wall framing (blob upload pending)",
+      metadata: {
+        stub: true,
+        subject: "media_wall",
+        note: "Placeholder evidence for walkthrough hotspot; no blob stored",
+      },
+    })
+    .returning();
+  await db.insert(evidenceLinks).values({
+    evidenceId: mediaWallPhoto.id,
+    entityId: mediaWall.id,
   });
 
   await db.insert(captureTasks).values({

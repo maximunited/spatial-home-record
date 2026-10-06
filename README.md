@@ -4,13 +4,14 @@
 
 Evidence-backed spatial home record: structured apartment entities with per-attribute confidence, calibrated plan geometry, rich detail forms, and Home Assistant Picture Elements export.
 
-## Status (pass 2 first chunks)
+## Status (pass 2)
 
 - Design: [`docs/superpowers/specs/2026-10-06-spatial-home-record-design.md`](docs/superpowers/specs/2026-10-06-spatial-home-record-design.md)
 - Docs index: [`docs/README.md`](docs/README.md)
 - Geometry editor on room/wall hubs (walls, openings, ceiling height)
 - Detail forms for floor tiles, TV, wall tech points, cabinet inventory
 - HA export v0: fixed isometric SVG → downloadable Picture Elements package
+- **3D walkthrough** — React Three Fiber orbit/walk viewer from parametric plan geometry; mesh selection opens detail panel; photo hotspots; link to top-down geometry editor
 - CI: unit + Postgres integration
 
 ## Setup

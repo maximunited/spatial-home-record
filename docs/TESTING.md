@@ -16,6 +16,7 @@
 - `tests/domain.test.ts` — confidence, anchors, relationships
 - `tests/entity-tree.test.ts` — tree build, search filter, entity hrefs
 - `tests/geometry.test.ts` — room plan, plan_wall anchors, isometric projection
+- `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/detail-schemas.test.ts` — section matching and field parsing
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package
 - `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA against real Postgres
@@ -42,5 +43,6 @@ npm run test:integration
 
 1. `npm run seed`
 2. Open the Living Room room hub — edit plan width/depth/ceiling, wall endpoints, openings
-3. Open Floor Tiles / TV / Socket / Media Cabinet — save detail fields with confidence
-4. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg`
+3. Open Walkthrough — orbit the volume, click wall/TV/door, confirm detail panel + photo hotspot
+4. Open Floor Tiles / TV / Socket / Media Cabinet — save detail fields with confidence
+5. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg`

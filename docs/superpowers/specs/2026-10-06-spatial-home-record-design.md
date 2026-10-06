@@ -106,7 +106,7 @@ Technical points use: `{ corner, u, height_affl, depth, side, width, height }` o
 | `/projects/[id]/capture` | Capture checklist stub |
 | `/projects/[id]/search` | Search stub |
 | `/projects/[id]/export/ha` | HA export profile stub |
-| `/projects/[id]/walkthrough` | Viewer placeholder |
+| `/projects/[id]/walkthrough` | Three.js / R3F walkthrough from parametric geometry |
 
 **Layout:** left hierarchy tree; center context placeholder; right detail panel when selected. Selection is by stable entity ID.
 

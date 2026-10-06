@@ -4,12 +4,20 @@ import { closeDb } from "@/db/client";
 import {
   createProject,
   getEntityBundle,
+  getHaExportProfile,
   insertEntity,
   insertRelationship,
+  listAttributesForEntities,
   listEntitiesByProject,
   searchEntities,
+  updateEntitySpatialAnchor,
+  updateHaExportProfile,
   upsertAttribute,
 } from "@/lib/projects";
+import { buildRoomScene } from "@/lib/geometry";
+import { buildHaExportPackage } from "@/lib/ha-export";
+import { getDb } from "@/db/client";
+import { haExportProfiles } from "@/db/schema";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -125,6 +133,128 @@ describe.runIf(hasDb)("projects integration", () => {
       const hits = await searchEntities(project.id, "television");
       expect(hits.some((e) => e.id === tv.id)).toBe(true);
       expect(hits.some((e) => e.id === room.id)).toBe(false);
+    },
+    30_000,
+  );
+
+  it(
+    "persists wall geometry and builds an HA export package",
+    async () => {
+      const project = await createProject({
+        name: `Geometry HA ${Date.now()}`,
+      });
+      const room = await insertEntity({
+        projectId: project.id,
+        type: "room",
+        name: "Geo Room",
+      });
+      await upsertAttribute({
+        entityId: room.id,
+        key: "plan_width",
+        value: 4,
+        units: "m",
+        confidence: "confirmed",
+      });
+      await upsertAttribute({
+        entityId: room.id,
+        key: "plan_depth",
+        value: 3,
+        units: "m",
+        confidence: "confirmed",
+      });
+      await upsertAttribute({
+        entityId: room.id,
+        key: "ceiling_height",
+        value: 2.7,
+        units: "m",
+        confidence: "confirmed",
+      });
+
+      const wall = await insertEntity({
+        projectId: project.id,
+        parentId: room.id,
+        type: "wall",
+        name: "North",
+        spatialAnchor: { kind: "plan_wall", x0: 0, y0: 3, x1: 4, y1: 3 },
+      });
+      await upsertAttribute({
+        entityId: wall.id,
+        key: "height",
+        value: 2.7,
+        units: "m",
+        confidence: "confirmed",
+      });
+
+      const updated = await updateEntitySpatialAnchor({
+        entityId: wall.id,
+        projectId: project.id,
+        spatialAnchor: { kind: "plan_wall", x0: 0, y0: 3, x1: 4.5, y1: 3 },
+      });
+      expect(updated?.spatialAnchor).toMatchObject({ x1: 4.5 });
+
+      const light = await insertEntity({
+        projectId: project.id,
+        parentId: room.id,
+        type: "fixture",
+        category: "smart_light",
+        name: "Light",
+        spatialAnchor: { kind: "room", x: 2, y: 1.5, z: 2.5 },
+      });
+
+      const db = getDb();
+      const [profile] = await db
+        .insert(haExportProfiles)
+        .values({
+          projectId: project.id,
+          name: "Test Iso",
+          camera: { preset: "isometric", yaw: 45, pitch: 35 },
+          mappings: [
+            {
+              entityId: light.id,
+              haEntityId: "light.test",
+              actions: { tap: "toggle" },
+            },
+          ],
+          options: { include_light_overlays: true },
+        })
+        .returning();
+
+      const mapped = await updateHaExportProfile({
+        profileId: profile.id,
+        projectId: project.id,
+        mappings: [
+          {
+            entityId: light.id,
+            haEntityId: "light.test_updated",
+            actions: { tap: "toggle" },
+          },
+        ],
+      });
+      expect(mapped?.mappings[0]?.haEntityId).toBe("light.test_updated");
+
+      const fetched = await getHaExportProfile(profile.id, project.id);
+      expect(fetched?.name).toBe("Test Iso");
+
+      const entities = await listEntitiesByProject(project.id);
+      const attributes = await listAttributesForEntities(
+        entities.map((e) => e.id),
+      );
+      const scene = buildRoomScene(room, entities, attributes);
+      expect(scene.walls).toHaveLength(1);
+
+      const pkg = buildHaExportPackage({
+        projectId: project.id,
+        profileId: profile.id,
+        profileName: profile.name,
+        camera: profile.camera,
+        mappings: mapped!.mappings,
+        options: profile.options,
+        room,
+        entities,
+        attributes,
+      });
+      expect(pkg.pictureElementsYaml).toContain("light.test_updated");
+      expect(pkg.isometricSvg).toContain("<svg");
     },
     30_000,
   );

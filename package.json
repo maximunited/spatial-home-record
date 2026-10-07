@@ -20,7 +20,8 @@
     "import:apt54": "tsx scripts/import-apartment-54.ts",
     "cad:dwg": "node scripts/cad/dwg-to-underlay.mjs",
     "cad:dxf": "python scripts/cad/dxf-to-underlay.py",
-    "cad:apt54": "node scripts/cad/dwg-to-underlay.mjs --apt54 && python scripts/cad/dxf-to-underlay.py --apt54"
+    "cad:apt54": "node scripts/cad/dwg-to-underlay.mjs --apt54 && python scripts/cad/dxf-to-underlay.py --apt54",
+    "cad:apply-walls": "tsx scripts/apply-cad-walls.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",

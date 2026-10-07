@@ -38,6 +38,7 @@ Clerk keys are optional; without them, routes are open for local development.
 | `npm run lint` | ESLint |
 | `npm run seed` | Living-room pilot project |
 | `npm run import:apt54` | Local Apartment 54 import (gitignored uploads) |
+| `npm run cad:apply-walls` | Upsert CAD `*.walls.json` → Living Room `plan_wall` entities |
 | `npm run db:push` | Push Drizzle schema |
 
 ## Docs

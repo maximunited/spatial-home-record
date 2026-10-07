@@ -49,7 +49,7 @@ Under `public/imports/cad-apt54/`:
 | `*.dxf` | Intermediate interchange |
 | `*.raw.svg` / `*.svg` | Full LibreDWG dump (often huge viewBox, light strokes) |
 | `*.underlay.svg` | Cropped wall layers — use this in the app |
-| `*.walls.json` | LINE/LWPOLYLINE segments + meter guess (not auto-imported) |
+| `*.walls.json` | LINE/LWPOLYLINE segments + meter guess → editable walls via `cad:apply-walls` |
 | `*.meta.json` | Conversion stats |
 
 ## Attach to Apartment 54
@@ -58,9 +58,14 @@ Under `public/imports/cad-apt54/`:
 npm run import:apt54
 # Optional: make CAD the default underlay instead of Plan 1 JPG
 APT54_CAD_PRIMARY=1 npm run import:apt54
+
+# Seed editable plan_wall entities from *.walls.json onto Living Room
+npm run cad:apply-walls
+# Or during import:
+APT54_APPLY_WALLS=1 npm run import:apt54
 ```
 
-Then open Living Room → plan underlay Evidence dropdown → **CAD underlay (…)**.
+Then open Living Room → plan underlay Evidence dropdown → **CAD underlay (…)**. Geometry editor lists CAD walls (confidence **supported** from CAD; edit freely).
 
 ## Manual AutoCAD export (if WASM fails)
 

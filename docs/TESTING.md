@@ -16,6 +16,7 @@
 - `tests/domain.test.ts` — confidence, anchors, relationships
 - `tests/entity-tree.test.ts` — tree build, search filter, entity hrefs
 - `tests/geometry.test.ts` — room plan, plan_wall anchors, isometric projection
+- `tests/cad-walls.test.ts` — CAD segment simplify/merge + room wall proposals
 - `tests/plan-underlay.test.ts` — underlay transform, primary plan pick, calibration room deep-link
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing

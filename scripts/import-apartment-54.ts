@@ -8,10 +8,12 @@
  *   npm run import:apt54
  *   APT54_SOURCE="U:\\...\\Apartment 54" npm run import:apt54
  *   APT54_DRY_RUN=1 npm run import:apt54
+ *   APT54_APPLY_WALLS=1 npm run import:apt54   # also upsert geometry from *.walls.json
  *
  * Does NOT import: Payments/, sale contracts, bank docs, .p12 certs, other units' plans,
  * or AutoCAD .dwg binaries. Optional CAD underlay SVG (from scripts/cad/) is imported
- * from gitignored public/imports/cad-apt54/ when present.
+ * from gitignored public/imports/cad-apt54/ when present. Wall segments → editable
+ * plan_wall entities via npm run cad:apply-walls (or APT54_APPLY_WALLS=1).
  *
  * Re-run deletes/replaces the project named below.
  */
@@ -33,6 +35,10 @@ import {
   upsertAttribute,
 } from "../src/lib/projects";
 import { randomUUID } from "node:crypto";
+import {
+  applyCadWallsToRoom,
+  findLatestWallsJson,
+} from "./apply-cad-walls";
 
 const PROJECT_NAME = "Apartment 54 / Neve Yehushua 15";
 
@@ -313,6 +319,8 @@ async function main() {
 
   const cadUnderlayAbs = await findCadUnderlaySvg();
   const cadAsPrimary = process.env.APT54_CAD_PRIMARY === "1";
+  const applyWalls = process.env.APT54_APPLY_WALLS === "1";
+  const wallsJsonAbs = applyWalls ? await findLatestWallsJson() : null;
 
   if (dryRun) {
     console.log(`Would import ${ASSETS.length} assets (no DB writes).`);
@@ -328,6 +336,17 @@ async function main() {
       console.log(
         "  (no CAD underlay — run npm run cad:apt54 then re-import to attach SVG)",
       );
+    }
+    if (applyWalls) {
+      if (wallsJsonAbs) {
+        console.log(
+          `  [geometry] Would apply CAD walls from ${path.basename(wallsJsonAbs)} → Living Room`,
+        );
+      } else {
+        console.log(
+          "  (APT54_APPLY_WALLS=1 but no *.walls.json — run npm run cad:apt54 first)",
+        );
+      }
     }
     return;
   }
@@ -456,29 +475,33 @@ async function main() {
     name: "Walk-in Closet",
   });
 
-  const mediaWall = await insertEntity({
-    projectId: project.id,
-    parentId: living.id,
-    type: "wall",
-    category: "media_wall",
-    name: "Media Wall (stub)",
-    spatialAnchor: { kind: "plan_wall", x0: W, y0: D, x1: 0, y1: D },
-  });
-  await upsertAttribute({
-    entityId: mediaWall.id,
-    key: "length",
-    value: W,
-    units: "m",
-    confidence: "estimated",
-    provenance: "import_stub_pending_calibration",
-  });
-  await upsertAttribute({
-    entityId: mediaWall.id,
-    key: "height",
-    value: H,
-    units: "m",
-    confidence: "estimated",
-  });
+  // Stub media wall only when CAD walls are not about to replace all room walls.
+  let mediaWall: { id: string } | null = null;
+  if (!(applyWalls && wallsJsonAbs)) {
+    mediaWall = await insertEntity({
+      projectId: project.id,
+      parentId: living.id,
+      type: "wall",
+      category: "media_wall",
+      name: "Media Wall (stub)",
+      spatialAnchor: { kind: "plan_wall", x0: W, y0: D, x1: 0, y1: D },
+    });
+    await upsertAttribute({
+      entityId: mediaWall.id,
+      key: "length",
+      value: W,
+      units: "m",
+      confidence: "estimated",
+      provenance: "import_stub_pending_calibration",
+    });
+    await upsertAttribute({
+      entityId: mediaWall.id,
+      key: "height",
+      value: H,
+      units: "m",
+      confidence: "estimated",
+    });
+  }
 
   const floorTiles = await insertEntity({
     projectId: project.id,
@@ -497,7 +520,7 @@ async function main() {
     bedroom3,
     bath,
     closet,
-    mediaWall,
+    ...(mediaWall ? { mediaWall } : {}),
     floorTiles,
   };
 
@@ -549,7 +572,7 @@ async function main() {
         entityId: target.id,
       });
       // Wall compare UI looks at wall entity; also link construction/current to media wall.
-      if (asset.phase && target.id === living.id) {
+      if (asset.phase && target.id === living.id && mediaWall) {
         await db.insert(evidenceLinks).values({
           evidenceId: row.id,
           entityId: mediaWall.id,
@@ -639,6 +662,27 @@ async function main() {
     });
   }
 
+  let cadWallsApply: Awaited<ReturnType<typeof applyCadWallsToRoom>> | null =
+    null;
+  if (applyWalls) {
+    if (!wallsJsonAbs) {
+      console.warn(
+        "APT54_APPLY_WALLS=1 but no *.walls.json found; skipping wall geometry.",
+      );
+    } else {
+      cadWallsApply = await applyCadWallsToRoom({
+        wallsPath: wallsJsonAbs,
+        projectNameSubstr: PROJECT_NAME,
+        roomName: "Living Room",
+        dryRun: false,
+        replace: true,
+      });
+      console.log(
+        `CAD walls applied: ${cadWallsApply.insertedWalls} walls (${cadWallsApply.mode}), plan ${cadWallsApply.planWidth}×${cadWallsApply.planDepth} m`,
+      );
+    }
+  }
+
   const calibratePath = underlayEvidenceId
     ? `/projects/${project.id}/rooms/${living.id}?evidence=${underlayEvidenceId}`
     : `/projects/${project.id}/rooms/${living.id}`;
@@ -651,18 +695,21 @@ async function main() {
         roomIds: {
           living: living.id,
           kitchen: kitchen.id,
-          mediaWall: mediaWall.id,
+          ...(mediaWall ? { mediaWall: mediaWall.id } : {}),
         },
         primaryPlanEvidenceId,
         cadUnderlayEvidenceId,
+        cadWallsApply,
         calibratePath,
         evidenceCount,
         documentCount,
         bytesCopied,
         uploadsDir: `public/uploads/${project.id}/`,
-        note: cadUnderlayEvidenceId
-          ? "CAD underlay attached. In geometry editor, pick it from Evidence (or APT54_CAD_PRIMARY=1 on re-import)."
-          : "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
+        note: cadWallsApply
+          ? "CAD walls upserted onto Living Room. Open calibratePath — geometry editor shows editable plan_wall entities."
+          : cadUnderlayEvidenceId
+            ? "CAD underlay attached. Run npm run cad:apply-walls (or APT54_APPLY_WALLS=1) to seed wall geometry from walls.json."
+            : "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
       },
       null,
       2,

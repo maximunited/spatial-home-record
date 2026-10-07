@@ -42,7 +42,7 @@ Walls use plan-space endpoints:
 }
 ```
 
-Room dimensions live on the room entity as attributes: `plan_width`, `plan_depth`, `ceiling_height` (meters). Geometry helpers: [`src/lib/geometry.ts`](../src/lib/geometry.ts).
+Room dimensions live on the room entity as attributes: `plan_width`, `plan_depth`, `ceiling_height` (meters). Geometry helpers: [`src/lib/geometry.ts`](../src/lib/geometry.ts). CAD `*.walls.json` → simplified `plan_wall` proposals: [`src/lib/cad-walls.ts`](../src/lib/cad-walls.ts) (`npm run cad:apply-walls`).
 
 Plan calibration underlay (optional JSON attribute `plan_underlay` on the room): `{ evidenceId, opacity, scale, offsetX, offsetY }` with per-attribute confidence (**measured** UI label ↔ `confirmed`/`supported`; **estimated** ↔ `estimated`/`unknown`). Primary plan evidence may set `metadata.role = primary_plan`. Helpers: [`src/lib/plan-underlay.ts`](../src/lib/plan-underlay.ts).
 

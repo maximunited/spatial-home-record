@@ -38,6 +38,9 @@ npm run import:apt54
 
 # Import with CAD SVG as default underlay (after npm run cad:apt54)
 APT54_CAD_PRIMARY=1 npm run import:apt54
+
+# Import and seed editable wall geometry from *.walls.json onto Living Room
+APT54_APPLY_WALLS=1 npm run import:apt54
 ```
 
 Re-running deletes and recreates the project named **Apartment 54 / Neve Yehushua 15**. Project/room/evidence IDs change on re-import — the app resolves by name (`Apartment 54` / `Living Room`) and primary-plan metadata, not hard-coded UUIDs.
@@ -79,9 +82,10 @@ No native `.dxf` in the archive; conversion produces DXF locally.
 ### Practical path on this machine
 
 1. **LibreDWG WASM** (`@mlightcad/libredwg-web`) — converts DWG → DXF + raw SVG without AutoCAD. GPL-3.0; install as a **dev-only** package for scripts, not as an app runtime dependency.
-2. **ezdxf** — crops wall layers (`A-WL*`, `A-WIN*`, `A-DOR`, …) into a dark `*.underlay.svg` (~50 KB) and `*.walls.json` (segment list; not auto-imported into room geometry yet).
-3. **ODA File Converter** via Chocolatey currently fails (vendor download returns HTML; checksum mismatch). Skip unless you install ODA manually from Open Design Alliance.
-4. Paid AutoCAD is optional: `SAVEAS` DXF, then run the Python step only.
+2. **ezdxf** — crops wall layers (`A-WL*`, `A-WIN*`, `A-DOR`, …) into a dark `*.underlay.svg` (~50 KB) and `*.walls.json` (segment list + meter guess).
+3. **CAD → editable walls** — `npm run cad:apply-walls` (or `APT54_APPLY_WALLS=1` on import) simplifies structural segments and upserts `plan_wall` entities onto Living Room.
+4. **ODA File Converter** via Chocolatey currently fails (vendor download returns HTML; checksum mismatch). Skip unless you install ODA manually from Open Design Alliance.
+5. Paid AutoCAD is optional: `SAVEAS` DXF, then run the Python step only.
 
 ### Run conversion
 
@@ -95,7 +99,28 @@ Details: [scripts/cad/README.md](../scripts/cad/README.md).
 
 Then `npm run import:apt54` — Living Room Evidence list includes **CAD underlay**. Pick it in the geometry editor and align like Plan 1.
 
-Drawing units for the unit plan are treated as **centimeters** (apartment extents ~16×14 m after crop). Wall JSON is for future geometry assist; calibrate visually first.
+Drawing units for the unit plan are treated as **centimeters** (apartment extents ~16×14 m after crop).
+
+### Seed walls from `*.walls.json`
+
+After conversion (and preferably after import so the project exists):
+
+```bash
+# Preview proposal counts (no DB)
+APT54_DRY_RUN=1 npm run cad:apply-walls
+
+# Upsert onto Living Room (finds project/room by name)
+npm run cad:apply-walls
+
+# Modes: outline (default, shell near bbox), all (interior+shell), aabb (4 rectangle walls)
+APT54_WALLS_MODE=all npm run cad:apply-walls
+```
+
+Or in one import pass: `APT54_APPLY_WALLS=1 npm run import:apt54`.
+
+Helpers live in [`src/lib/cad-walls.ts`](../src/lib/cad-walls.ts): filter structural layers, drop short noise, snap to 5 cm, merge colinear runs, normalize to room-local meters, propose `plan_wall` anchors with confidence **supported** (outline/all) or **estimated** (aabb). Existing wall children of Living Room are replaced. Geometry editor shows the new walls; you can still edit endpoints/lengths.
+
+Limits: not full BIM; openings (`A-DOR` / `A-WIN`) are not auto-detected; wet-room DWGs are out of scope; Living Room currently hosts the **apartment outline** (or all segments), not per-room CAD splits.
 
 ### If conversion fails
 
@@ -103,8 +128,8 @@ Export DXF from AutoCAD/TrueView → drop into `public/imports/cad-apt54/` → `
 
 ## Next steps after import
 
-1. Finish Living Room calibration (Plan 1 and/or CAD underlay + real dims/walls).
+1. Finish Living Room calibration (Plan 1 and/or CAD underlay + CAD walls + real tape dims).
 2. Link more construction vs current photos to walls for compare UI.
 3. Attach remaining product docs (kitchen countertops, inspections defects) via Documents on entities.
 4. Capture fresh “current” photos — archive is mostly 2016–2018 construction/handover era.
-5. Optional: use `*.walls.json` segments to seed wall polylines after underlay alignment (not automated yet).
+5. Optionally split CAD segments into per-room polygons (kitchen, bedrooms) — not automated yet.

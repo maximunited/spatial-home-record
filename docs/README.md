@@ -4,7 +4,7 @@
 | --- | ------- |
 | [DATA-MODEL.md](DATA-MODEL.md) | Postgres entities, anchors, confidence, HA profiles |
 | [BLOB-STORAGE.md](BLOB-STORAGE.md) | Local `public/` uploads vs future S3 |
-| [IMPORT-APARTMENT-54.md](IMPORT-APARTMENT-54.md) | Pilot import from personal apartment folder (local only) |
+| [IMPORT-APARTMENT-54.md](IMPORT-APARTMENT-54.md) | Pilot import from personal apartment folder (local only), including CAD→SVG underlay |
 | [TESTING.md](TESTING.md) | Unit vs integration tests and CI |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common setup failures |
 | [superpowers/specs/2026-10-06-spatial-home-record-design.md](superpowers/specs/2026-10-06-spatial-home-record-design.md) | Product design |

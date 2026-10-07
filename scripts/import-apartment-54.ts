@@ -10,7 +10,10 @@
  *   APT54_DRY_RUN=1 npm run import:apt54
  *
  * Does NOT import: Payments/, sale contracts, bank docs, .p12 certs, other units' plans,
- * or AutoCAD .dwg binaries. Re-run deletes/replaces the project named below.
+ * or AutoCAD .dwg binaries. Optional CAD underlay SVG (from scripts/cad/) is imported
+ * from gitignored public/imports/cad-apt54/ when present.
+ *
+ * Re-run deletes/replaces the project named below.
  */
 import "dotenv/config";
 import { copyFile, mkdir, readFile, stat } from "node:fs/promises";
@@ -225,10 +228,38 @@ function contentTypeFor(filePath: string): string {
       return "image/jpeg";
     case ".png":
       return "image/png";
+    case ".svg":
+      return "image/svg+xml";
     case ".pdf":
       return "application/pdf";
     default:
       return "application/octet-stream";
+  }
+}
+
+/** Local CAD conversion outputs (never commit personal DXF/DWG). */
+const CAD_IMPORT_DIR = path.join(
+  process.cwd(),
+  "public",
+  "imports",
+  "cad-apt54",
+);
+
+async function findCadUnderlaySvg(): Promise<string | null> {
+  try {
+    const { readdir } = await import("node:fs/promises");
+    const names = await readdir(CAD_IMPORT_DIR);
+    const underlays = names
+      .filter((n) => n.toLowerCase().endsWith(".underlay.svg"))
+      .sort();
+    if (!underlays.length) return null;
+    // Prefer unit-plan / shinuyim naming when several exist
+    const preferred =
+      underlays.find((n) => /shinuyim|unit-plan|שינויים/i.test(n)) ??
+      underlays[0];
+    return path.join(CAD_IMPORT_DIR, preferred);
+  } catch {
+    return null;
   }
 }
 
@@ -280,10 +311,23 @@ async function main() {
     return;
   }
 
+  const cadUnderlayAbs = await findCadUnderlaySvg();
+  const cadAsPrimary = process.env.APT54_CAD_PRIMARY === "1";
+
   if (dryRun) {
     console.log(`Would import ${ASSETS.length} assets (no DB writes).`);
     for (const a of ASSETS) {
       console.log(`  [${a.kind}/${a.type}] ${a.rel} → ${a.linkTo}`);
+    }
+    if (cadUnderlayAbs) {
+      console.log(
+        `  [evidence/plan] CAD underlay ${path.basename(cadUnderlayAbs)} → living` +
+          (cadAsPrimary ? " (primary via APT54_CAD_PRIMARY=1)" : " (secondary)"),
+      );
+    } else {
+      console.log(
+        "  (no CAD underlay — run npm run cad:apt54 then re-import to attach SVG)",
+      );
     }
     return;
   }
@@ -541,12 +585,50 @@ async function main() {
     }
   }
 
-  if (primaryPlanEvidenceId) {
+  let cadUnderlayEvidenceId: string | null = null;
+  if (cadUnderlayAbs) {
+    const { blob, storageKey, byteSize } = await copyIntoUploads({
+      projectId: project.id,
+      sourceAbs: cadUnderlayAbs,
+      originalName: path.basename(cadUnderlayAbs),
+    });
+    bytesCopied += byteSize;
+    const [row] = await db
+      .insert(evidence)
+      .values({
+        projectId: project.id,
+        type: "plan",
+        blobId: blob.id,
+        summary:
+          "CAD underlay (DWG→DXF→SVG) — Apartment 54 unit plan wall layers",
+        metadata: {
+          source_rel: "public/imports/cad-apt54/",
+          import: "apt54",
+          role: cadAsPrimary ? "primary_plan" : "cad_underlay",
+          ...(cadAsPrimary ? { primary_calibration: true } : {}),
+          pipeline: "scripts/cad/dwg-to-underlay.mjs + dxf-to-underlay.py",
+        },
+      })
+      .returning();
+    await db.insert(evidenceLinks).values({
+      evidenceId: row.id,
+      entityId: living.id,
+    });
+    cadUnderlayEvidenceId = row.id;
+    evidenceCount++;
+    console.log(`evidence plan (CAD underlay): ${storageKey}`);
+    if (cadAsPrimary) {
+      primaryPlanEvidenceId = row.id;
+    }
+  }
+
+  const underlayEvidenceId = primaryPlanEvidenceId ?? cadUnderlayEvidenceId;
+  if (underlayEvidenceId) {
     await upsertAttribute({
       entityId: living.id,
       key: "plan_underlay",
       value: {
-        evidenceId: primaryPlanEvidenceId,
+        evidenceId: underlayEvidenceId,
         opacity: 0.45,
         scale: 1,
         offsetX: 0,
@@ -557,8 +639,8 @@ async function main() {
     });
   }
 
-  const calibratePath = primaryPlanEvidenceId
-    ? `/projects/${project.id}/rooms/${living.id}?evidence=${primaryPlanEvidenceId}`
+  const calibratePath = underlayEvidenceId
+    ? `/projects/${project.id}/rooms/${living.id}?evidence=${underlayEvidenceId}`
     : `/projects/${project.id}/rooms/${living.id}`;
 
   console.log(
@@ -572,12 +654,15 @@ async function main() {
           mediaWall: mediaWall.id,
         },
         primaryPlanEvidenceId,
+        cadUnderlayEvidenceId,
         calibratePath,
         evidenceCount,
         documentCount,
         bytesCopied,
         uploadsDir: `public/uploads/${project.id}/`,
-        note: "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
+        note: cadUnderlayEvidenceId
+          ? "CAD underlay attached. In geometry editor, pick it from Evidence (or APT54_CAD_PRIMARY=1 on re-import)."
+          : "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
       },
       null,
       2,

@@ -267,7 +267,7 @@ describe.runIf(hasDb)("projects integration", () => {
       const scene = buildRoomScene(room, entities, attributes);
       expect(scene.walls).toHaveLength(1);
 
-      const pkg = buildHaExportPackage({
+      const pkg = await buildHaExportPackage({
         projectId: project.id,
         profileId: profile.id,
         profileName: profile.name,

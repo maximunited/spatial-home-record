@@ -22,7 +22,7 @@
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
 - `tests/detail-schemas.test.ts` — section matching and field parsing
-- `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG frames in manifest
+- `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG/WebM packaging (mocked ffmpeg)
 - `tests/model-snapshot.test.ts` — scene snapshot build/diff, orphaned mappings, export-diff document
 - `tests/share-redaction.test.ts` — layer defaults, payment redaction, share-safe evidence, passcode helpers
 - `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/model snapshots/documents/evidence/share links against real Postgres
@@ -51,7 +51,7 @@ npm run test:integration
 2. Open the Living Room room hub — edit plan width/depth/ceiling, wall endpoints, openings
 3. Open Floor Tiles / TV — confirm shared receipt under Documents; open Media Wall — construction vs current compare
 4. Open Socket / Media Cabinet — save detail fields with confidence
-5. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg` + `animations/blind_000.png` / `fan_000.png` + `export-diff.json`; re-export after a scene edit and check the diff panel
+5. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg` + `animations/blind_000.png` / `fan_000.png` + `export-diff.json` (+ WebM if ffmpeg present); re-export after a scene edit and check the diff panel
 
 ## Manual smoke (Apartment 54 plan underlay)
 

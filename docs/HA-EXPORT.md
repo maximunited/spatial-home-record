@@ -13,7 +13,8 @@ Spatial Home Record builds a ZIP from an `ha_export_profiles` row. Credentials a
 | `export-diff.json` | Scene diff vs baseline/latest `model_snapshots` row |
 | `animations/blind_000.png` … | Cover position sequence (open → closed) |
 | `animations/fan_000.png` … | Fan rotation loop |
-| `animations/README.md` | HA install + optional WebM via ffmpeg |
+| `animations/blind.webm` / `fan.webm` | Optional desktop WebM (ffmpeg at export time) |
+| `animations/README.md` | HA install + WebM notes |
 
 Frames are generated procedurally in [`src/lib/ha-export-animations.ts`](../src/lib/ha-export-animations.ts) (same zinc/orange/slate palette as the isometric SVG markers).
 
@@ -25,6 +26,7 @@ Frames are generated procedurally in [`src/lib/ha-export-animations.ts`](../src/
 | `include_climate_overlays` | `true` | Emit climate `state-badge` + occupancy `state-icon` |
 | `animated` | seed: `true` | Emit frame overlays for `cover.*` / `fan.*` |
 | `animation_mode` | `custom-cards` | `custom-cards` or `state-image` |
+| `include_webm` | `true` (when animated + custom-cards) | Run ffmpeg to package `blind.webm` / `fan.webm` and emit YAML `src`; skipped if ffmpeg missing or set `false` |
 
 Living Room Pilot seed maps:
 
@@ -42,7 +44,7 @@ Requires [HA-isometric-animated-picture-card](https://github.com/tikel1/HA-isome
 - `custom:ha-blinds-frame-card` — maps `current_position` to a PNG frame
 - `custom:ha-fan-loop-card` — maps fan `percentage` via `playMap` to loop speed
 
-PNG paths use the card convention `{prefix}{000}.png`. Optional WebM for desktop: see `animations/README.md` in the ZIP.
+PNG paths use the card convention `{prefix}{000}.png`. When WebM packaging succeeds, YAML also sets `src` to `/local/spatial-home-record/animations/{blind,fan}.webm`. Otherwise PNG-only (see `animations/README.md` in the ZIP).
 
 ### `state-image` (stock picture-elements)
 
@@ -70,5 +72,6 @@ Manual:
 1. `npm run seed` (needs `DATABASE_URL`) — creates Living Room Isometric profile with blind + fan mappings.
 2. Open `/projects/<id>/export/ha` → Download ZIP.
 3. Confirm ZIP contains `animations/blind_000.png`, `animations/fan_000.png`, `export-diff.json`, and YAML references `custom:ha-blinds-frame-card` / `custom:ha-fan-loop-card` (or `state_image` if you changed `animation_mode`).
-4. Change a fixture position or add a mapping, download again — `export-diff.json` / UI should report the scene delta while mappings remain.
-5. Copy `assets/` + `animations/` under HA `/config/www/spatial-home-record/`, import YAML, bind real entity ids — never paste tokens into this app.
+4. With ffmpeg on PATH, also expect `animations/blind.webm` / `fan.webm` and YAML `src`; without ffmpeg, manifest notes say WebM was skipped.
+5. Change a fixture position or add a mapping, download again — `export-diff.json` / UI should report the scene delta while mappings remain.
+6. Copy `assets/` + `animations/` under HA `/config/www/spatial-home-record/`, import YAML, bind real entity ids — never paste tokens into this app.

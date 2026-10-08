@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildHaExportPackage,
@@ -17,7 +19,24 @@ import {
   renderBlindFrame,
   renderFanFrame,
 } from "@/lib/ha-export-animations";
+import {
+  WEBM_EBML_MAGIC,
+  type FfmpegRunner,
+} from "@/lib/ha-export-webm";
 import { buildRoomScene } from "@/lib/geometry";
+
+/** Fake ffmpeg: writes EBML-magic WebM for each `-i` sequence output. */
+const fakeFfmpegRunner: FfmpegRunner = async (args, { cwd }) => {
+  if (args.includes("-version")) return;
+  const out = args[args.length - 1];
+  if (typeof out !== "string" || !out.endsWith(".webm")) {
+    throw new Error(`unexpected ffmpeg args: ${args.join(" ")}`);
+  }
+  await mkdir(cwd, { recursive: true });
+  const body = new Uint8Array(32);
+  body.set(WEBM_EBML_MAGIC, 0);
+  await writeFile(join(cwd, out), body);
+};
 
 describe("ha-export", () => {
   const room = {
@@ -147,10 +166,41 @@ describe("ha-export", () => {
     expect(yaml).toContain("png_path: /local/spatial-home-record/animations/blind_");
     expect(yaml).toContain("png_path: /local/spatial-home-record/animations/fan_");
     expect(yaml).toContain("playMap:");
+    expect(yaml).not.toContain(".webm");
     expect(yaml).not.toContain("token");
     expect(yaml).not.toContain("password");
     expect(yaml).toContain("ha-blinds-frame-card / ha-fan-loop-card");
     expect(yaml).not.toContain("animations are stubs");
+  });
+
+  it("emits custom-card src only when WebM is attached to the animation bundle", () => {
+    const base = buildAnimationBundle();
+    const yaml = buildPictureElementsYaml({
+      title: "Living Room Isometric",
+      imagePath: "/local/spatial-home-record/isometric.svg",
+      mappings: [
+        { entityId: "blind-1", haEntityId: "cover.living_room_blind" },
+        { entityId: "fan-1", haEntityId: "fan.living_room" },
+      ],
+      overlayPositions: new Map([
+        ["fan-1", { left: "50%", top: "40%" }],
+        ["blind-1", { left: "70%", top: "35%" }],
+      ]),
+      options: { animated: true, animation_mode: "custom-cards" },
+      animations: {
+        ...base,
+        webm: {
+          blindSrc: "/local/spatial-home-record/animations/blind.webm",
+          fanSrc: "/local/spatial-home-record/animations/fan.webm",
+        },
+      },
+    });
+    expect(yaml).toContain(
+      "src: /local/spatial-home-record/animations/blind.webm",
+    );
+    expect(yaml).toContain(
+      "src: /local/spatial-home-record/animations/fan.webm",
+    );
   });
 
   it("builds stock state-image overlays when animation_mode is state-image", () => {
@@ -303,8 +353,8 @@ describe("ha-export", () => {
     expect(svg).toContain("#a78bfa");
   });
 
-  it("packages zip with manifest and animation assets", () => {
-    const pkg = buildHaExportPackage({
+  it("packages zip with manifest and animation assets", async () => {
+    const pkg = await buildHaExportPackage({
       projectId: "proj-1",
       profileId: "prof-1",
       profileName: "Living Room Isometric",
@@ -330,6 +380,7 @@ describe("ha-export", () => {
         include_light_overlays: true,
         animated: true,
         animation_mode: "custom-cards",
+        include_webm: false,
       },
       room,
       entities: [room, wall, light, fan, blind],
@@ -346,13 +397,18 @@ describe("ha-export", () => {
       `animations/fan_${String(FAN_FRAME_COUNT - 1).padStart(3, "0")}.png`,
     );
     expect(pkg.manifest.files).toContain("animations/README.md");
+    expect(pkg.manifest.files).not.toContain("animations/blind.webm");
     expect(pkg.manifest.notes.some((n) => n.includes("credentials"))).toBe(
       true,
     );
     expect(pkg.manifest.notes.some((n) => n.includes("stubs"))).toBe(false);
+    expect(pkg.manifest.notes.some((n) => n.includes("include_webm is false"))).toBe(
+      true,
+    );
     expect(pkg.isometricSvg).toContain("<svg");
     expect(pkg.pictureElementsYaml).toContain("picture-elements");
     expect(pkg.pictureElementsYaml).toContain("custom:ha-blinds-frame-card");
+    expect(pkg.pictureElementsYaml).not.toContain(".webm");
     expect(pkg.animationFiles.length).toBeGreaterThan(BLIND_FRAME_COUNT);
 
     const zip = buildZipStore([
@@ -369,6 +425,93 @@ describe("ha-export", () => {
     expect(zip[0]).toBe(0x50);
     expect(zip[1]).toBe(0x4b);
     expect(zip.length).toBeGreaterThan(1000);
+  });
+
+  it("packages WebM into the ZIP when ffmpeg succeeds", async () => {
+    const pkg = await buildHaExportPackage({
+      projectId: "proj-1",
+      profileId: "prof-1",
+      profileName: "Living Room Isometric",
+      camera: { preset: "isometric", yaw: 45, pitch: 35 },
+      mappings: [
+        {
+          entityId: fan.id,
+          haEntityId: "fan.living_room",
+          label: "Fan",
+        },
+        {
+          entityId: blind.id,
+          haEntityId: "cover.living_room_blind",
+          label: "Blind",
+        },
+      ],
+      options: {
+        animated: true,
+        animation_mode: "custom-cards",
+        include_webm: true,
+      },
+      room,
+      entities: [room, wall, light, fan, blind],
+      attributes: attrs,
+      runFfmpeg: fakeFfmpegRunner,
+    });
+
+    expect(pkg.manifest.files).toContain("animations/blind.webm");
+    expect(pkg.manifest.files).toContain("animations/fan.webm");
+    expect(pkg.manifest.notes.some((n) => n.includes("packaged via ffmpeg"))).toBe(
+      true,
+    );
+    expect(pkg.pictureElementsYaml).toContain(
+      "src: /local/spatial-home-record/animations/blind.webm",
+    );
+    expect(pkg.pictureElementsYaml).toContain(
+      "src: /local/spatial-home-record/animations/fan.webm",
+    );
+
+    const blindWebmFile = pkg.animationFiles.find(
+      (f) => f.path === "animations/blind.webm",
+    );
+    const fanWebmFile = pkg.animationFiles.find(
+      (f) => f.path === "animations/fan.webm",
+    );
+    expect(blindWebmFile?.content[0]).toBe(0x1a);
+    expect(blindWebmFile?.content[1]).toBe(0x45);
+    expect(fanWebmFile?.content[0]).toBe(0x1a);
+  });
+
+  it("skips WebM gracefully when ffmpeg is unavailable", async () => {
+    const missingFfmpeg: FfmpegRunner = async () => {
+      throw new Error("ENOENT");
+    };
+    const pkg = await buildHaExportPackage({
+      projectId: "proj-1",
+      profileId: "prof-1",
+      profileName: "Living Room Isometric",
+      camera: { preset: "isometric", yaw: 45, pitch: 35 },
+      mappings: [
+        {
+          entityId: blind.id,
+          haEntityId: "cover.living_room_blind",
+          label: "Blind",
+        },
+      ],
+      options: {
+        animated: true,
+        animation_mode: "custom-cards",
+        include_webm: true,
+      },
+      room,
+      entities: [room, wall, blind],
+      attributes: attrs,
+      runFfmpeg: missingFfmpeg,
+    });
+
+    expect(pkg.manifest.files).toContain("animations/blind_000.png");
+    expect(pkg.manifest.files).not.toContain("animations/blind.webm");
+    expect(pkg.pictureElementsYaml).not.toContain(".webm");
+    expect(pkg.manifest.notes.some((n) => n.includes("ffmpeg not found"))).toBe(
+      true,
+    );
   });
 });
 

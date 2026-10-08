@@ -43,6 +43,14 @@ export type AnimationBundle = {
     playMap: Array<[number, number]>;
   };
   readme: string;
+  /**
+   * Present only when WebM was packaged into the ZIP (ffmpeg at export time).
+   * Desktop custom cards may set `src` to these local paths.
+   */
+  webm?: {
+    blindSrc: string;
+    fanSrc: string;
+  };
 };
 
 function crc32(data: Uint8Array): number {
@@ -308,9 +316,11 @@ Framing matches the isometric export markers (zinc / orange / slate palette).
 3. For continuous position/speed overlays, install
    [HA-isometric-animated-picture-card](https://github.com/tikel1/HA-isometric-animated-picture-card)
    (\`ha-blinds-frame-card\` + \`ha-fan-loop-card\`) and add Lovelace resources.
-4. Optional WebM (desktop custom cards prefer \`src\`): from this folder run
+4. Optional WebM (desktop custom cards prefer \`src\`): export packages
+   \`blind.webm\` / \`fan.webm\` when ffmpeg is on the export host PATH.
+   Otherwise from this folder run
    \`ffmpeg -y -framerate 12 -i blind_%03d.png -c:v libvpx-vp9 -pix_fmt yuva420p blind.webm\`
-   and the same for \`fan_%03d.png\` → \`fan.webm\`.
+   and the same for \`fan_%03d.png\` → \`fan.webm\` (fps 24).
 
 ## Stock picture-elements (no custom card)
 

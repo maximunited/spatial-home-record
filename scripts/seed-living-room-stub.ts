@@ -807,7 +807,8 @@ async function main() {
       include_climate_overlays: true,
       animated: true,
       animation_mode: "custom-cards",
-      note: "Blind/fan PNG sequences; climate = state-badge; occupancy = state-icon; see animations/README.md",
+      include_webm: true,
+      note: "Blind/fan PNG sequences + optional WebM via ffmpeg; climate = state-badge; occupancy = state-icon; see animations/README.md",
     },
   });
 

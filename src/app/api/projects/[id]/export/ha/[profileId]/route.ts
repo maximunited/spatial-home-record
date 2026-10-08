@@ -67,7 +67,7 @@ export async function GET(
     priorSnapshotLabel: prior?.label ?? null,
   });
 
-  const pkg = buildHaExportPackage({
+  const pkg = await buildHaExportPackage({
     projectId,
     profileId: profile.id,
     profileName: profile.name,

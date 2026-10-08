@@ -10,6 +10,10 @@ import {
   type AnimationAssetFile,
   type AnimationBundle,
 } from "@/lib/ha-export-animations";
+import {
+  packageAnimationWebm,
+  type FfmpegRunner,
+} from "@/lib/ha-export-webm";
 
 export type HaMapping = {
   entityId: string;
@@ -354,8 +358,9 @@ export function buildPictureElementsYaml(input: {
           frames: animations.blind.frameCount,
           fps: 12,
           speed: 0.5,
-          // Optional: add animations/blind.webm via ffmpeg (see animations/README.md)
-          src: `${animations.blind.pngPathPrefix.replace(/_$/, "")}.webm`,
+          ...(animations.webm?.blindSrc
+            ? { src: animations.webm.blindSrc }
+            : {}),
           style: overlayStyle(pos, m.style, {
             width: "8%",
             height: "12%",
@@ -395,7 +400,7 @@ export function buildPictureElementsYaml(input: {
           png_path: animations.fan.pngPathPrefix,
           frames: animations.fan.frameCount,
           fps: 24,
-          src: `${animations.fan.pngPathPrefix.replace(/_$/, "")}.webm`,
+          ...(animations.webm?.fanSrc ? { src: animations.webm.fanSrc } : {}),
           playMap: animations.fan.playMap,
           style: overlayStyle(pos, m.style, {
             width: "7%",
@@ -636,7 +641,7 @@ function entityWorldPoint(
   };
 }
 
-export function buildHaExportPackage(input: {
+export async function buildHaExportPackage(input: {
   projectId: string;
   profileId: string;
   profileName: string;
@@ -646,7 +651,9 @@ export function buildHaExportPackage(input: {
   room: EntityLike;
   entities: EntityLike[];
   attributes: AttrLike[];
-}): HaExportPackage {
+  /** Injected in tests; default shells out to system ffmpeg. */
+  runFfmpeg?: FfmpegRunner;
+}): Promise<HaExportPackage> {
   const camera = resolveCamera(input.camera);
   const scene = buildRoomScene(input.room, input.entities, input.attributes);
   const { overlays, cssPositions } = overlayScreenPositions(
@@ -655,7 +662,28 @@ export function buildHaExportPackage(input: {
     input.entities,
     input.mappings,
   );
-  const animations = buildAnimationBundle();
+  const animated = Boolean(input.options?.animated);
+  const animationMode = resolveAnimationMode(input.options);
+  const wantWebm =
+    animated &&
+    animationMode === "custom-cards" &&
+    input.options?.include_webm !== false;
+
+  let animations = buildAnimationBundle();
+  let webmNote: string | undefined;
+  if (wantWebm) {
+    const webm = await packageAnimationWebm(animations, {
+      runFfmpeg: input.runFfmpeg,
+      enabled: true,
+    });
+    animations = webm.bundle;
+    webmNote = webm.note;
+  } else if (animated && animationMode === "custom-cards") {
+    const webm = await packageAnimationWebm(animations, { enabled: false });
+    animations = webm.bundle;
+    webmNote = webm.note;
+  }
+
   const isometricSvg = renderIsometricSvg(scene, camera, overlays);
   const imagePath = "/local/spatial-home-record/isometric.svg";
   const pictureElementsYaml = buildPictureElementsYaml({
@@ -678,8 +706,14 @@ export function buildHaExportPackage(input: {
   );
 
   const animationPaths = animations.files.map((f) => f.path);
-  const animated = Boolean(input.options?.animated);
-  const animationMode = resolveAnimationMode(input.options);
+
+  const animationNote = animated
+    ? animationMode === "custom-cards"
+      ? animations.webm
+        ? "Blind/fan use ha-blinds-frame-card / ha-fan-loop-card (PNG sequences + packaged WebM for desktop `src`)."
+        : "Blind/fan use ha-blinds-frame-card / ha-fan-loop-card (PNG sequences; WebM optional via ffmpeg)."
+      : "Blind/fan use picture-elements image + state_image keyframes from animations/."
+    : "Set options.animated: true to emit frame-sequence overlays for covers/fans.";
 
   return {
     manifest: {
@@ -699,11 +733,8 @@ export function buildHaExportPackage(input: {
       notes: [
         "Never includes Home Assistant credentials.",
         "Copy assets/isometric.svg and animations/ to HA /config/www/spatial-home-record/.",
-        animated
-          ? animationMode === "custom-cards"
-            ? "Blind/fan use ha-blinds-frame-card / ha-fan-loop-card (PNG sequences; optional WebM via ffmpeg)."
-            : "Blind/fan use picture-elements image + state_image keyframes from animations/."
-          : "Set options.animated: true to emit frame-sequence overlays for covers/fans.",
+        animationNote,
+        ...(webmNote ? [webmNote] : []),
         "See animations/README.md for custom-card install and stock PE fallback.",
       ],
     },

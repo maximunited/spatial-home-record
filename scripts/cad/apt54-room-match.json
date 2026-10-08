@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "notes": "Apartment 54 / Neve Yehushua — room match hints for cad:apply-rooms. Coordinates are apartment-local meters after CAD normalize (origin at structural bbox min). Optional overrides: set seed {x,y} and/or bbox {minX,minY,maxX,maxY} per room name.",
+  "partition": {
+    "cellSize": 0.15,
+    "wallThickness": 0.12,
+    "collapseDoubleLines": true,
+    "targetSeedCount": 12,
+    "minRegionArea": 2.0,
+    "minSeedClearance": 0.4,
+    "minSeedSeparation": 1.8
+  },
+  "match": {
+    "livingName": "Living Room",
+    "kitchenName": "Kitchen",
+    "bathroomName": "Bathroom",
+    "closetName": "Walk-in Closet",
+    "bedroomNames": ["Master Bedroom", "Bedroom 2", "Bedroom 3"]
+  },
+  "overrides": []
+}

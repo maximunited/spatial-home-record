@@ -59,13 +59,17 @@ npm run import:apt54
 # Optional: make CAD the default underlay instead of Plan 1 JPG
 APT54_CAD_PRIMARY=1 npm run import:apt54
 
-# Seed editable plan_wall entities from *.walls.json onto Living Room
+# Seed editable plan_wall entities from *.walls.json onto Living Room (outline)
 npm run cad:apply-walls
+# Split into per-room wall sets (Living, Kitchen, bedrooms, …)
+npm run cad:apply-rooms
 # Or during import:
-APT54_APPLY_WALLS=1 npm run import:apt54
+APT54_APPLY_ROOMS=1 npm run import:apt54
 ```
 
-Then open Living Room → plan underlay Evidence dropdown → **CAD underlay (…)**. Geometry editor lists CAD walls (confidence **supported** from CAD; edit freely).
+Room-match config: [`apt54-room-match.json`](./apt54-room-match.json) (`APT54_ROOM_MATCH` to override). Matching rules are documented in [IMPORT-APARTMENT-54.md](../../docs/IMPORT-APARTMENT-54.md).
+
+Then open any room → geometry editor / walkthrough. Living Room still hosts the CAD underlay Evidence dropdown → **CAD underlay (…)**.
 
 ## Manual AutoCAD export (if WASM fails)
 

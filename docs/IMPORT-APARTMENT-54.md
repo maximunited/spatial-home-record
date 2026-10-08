@@ -39,8 +39,11 @@ npm run import:apt54
 # Import with CAD SVG as default underlay (after npm run cad:apt54)
 APT54_CAD_PRIMARY=1 npm run import:apt54
 
-# Import and seed editable wall geometry from *.walls.json onto Living Room
+# Import and seed editable wall geometry from *.walls.json onto Living Room (outline)
 APT54_APPLY_WALLS=1 npm run import:apt54
+
+# Import and split CAD into per-room wall sets (preferred after rooms exist)
+APT54_APPLY_ROOMS=1 npm run import:apt54
 ```
 
 Re-running deletes and recreates the project named **Apartment 54 / Neve Yehushua 15**. Project/room/evidence IDs change on re-import — the app resolves by name (`Apartment 54` / `Living Room`) and primary-plan metadata, not hard-coded UUIDs.
@@ -83,7 +86,7 @@ No native `.dxf` in the archive; conversion produces DXF locally.
 
 1. **LibreDWG WASM** (`@mlightcad/libredwg-web`) — converts DWG → DXF + raw SVG without AutoCAD. GPL-3.0; install as a **dev-only** package for scripts, not as an app runtime dependency.
 2. **ezdxf** — crops wall layers (`A-WL*`, `A-WIN*`, `A-DOR`, …) into a dark `*.underlay.svg` (~50 KB) and `*.walls.json` (segment list + meter guess).
-3. **CAD → editable walls** — `npm run cad:apply-walls` (or `APT54_APPLY_WALLS=1` on import) simplifies structural segments and upserts `plan_wall` entities onto Living Room.
+3. **CAD → editable walls** — `npm run cad:apply-walls` (Living outline) or `npm run cad:apply-rooms` (per-room sets; or `APT54_APPLY_ROOMS=1` on import).
 4. **ODA File Converter** via Chocolatey currently fails (vendor download returns HTML; checksum mismatch). Skip unless you install ODA manually from Open Design Alliance.
 5. Paid AutoCAD is optional: `SAVEAS` DXF, then run the Python step only.
 
@@ -106,21 +109,48 @@ Drawing units for the unit plan are treated as **centimeters** (apartment extent
 After conversion (and preferably after import so the project exists):
 
 ```bash
-# Preview proposal counts (no DB)
+# Preview proposal counts (no DB) — Living Room outline only
 APT54_DRY_RUN=1 npm run cad:apply-walls
 
-# Upsert onto Living Room (finds project/room by name)
+# Upsert apartment outline onto Living Room (finds project/room by name)
 npm run cad:apply-walls
 
 # Modes: outline (default, shell near bbox), all (interior+shell), aabb (4 rectangle walls)
 APT54_WALLS_MODE=all npm run cad:apply-walls
+
+# Preferred: split into per-room wall sets (Living, Kitchen, bedrooms, Bath, Closet)
+APT54_DRY_RUN=1 npm run cad:apply-rooms
+npm run cad:apply-rooms
 ```
 
-Or in one import pass: `APT54_APPLY_WALLS=1 npm run import:apt54`.
+Or in one import pass: `APT54_APPLY_ROOMS=1 npm run import:apt54` (takes precedence over `APT54_APPLY_WALLS`).
 
-Helpers live in [`src/lib/cad-walls.ts`](../src/lib/cad-walls.ts): filter structural layers, drop short noise, snap to 5 cm, merge colinear runs, normalize to room-local meters, propose `plan_wall` anchors with confidence **supported** (outline/all) or **estimated** (aabb). Existing wall children of Living Room are replaced. Geometry editor shows the new walls; you can still edit endpoints/lengths.
+**Outline helpers** ([`src/lib/cad-walls.ts`](../src/lib/cad-walls.ts)): filter structural layers, drop short noise, snap to 5 cm, merge colinear runs, propose `plan_wall` anchors with confidence **supported** (outline/all) or **estimated** (aabb).
 
-Limits: not full BIM; openings (`A-DOR` / `A-WIN`) are not auto-detected; wet-room DWGs are out of scope; Living Room currently hosts the **apartment outline** (or all segments), not per-room CAD splits.
+**Per-room helpers** ([`src/lib/cad-rooms.ts`](../src/lib/cad-rooms.ts)):
+
+1. Optional double-line → centerline collapse.
+2. Partition open space (distance-to-wall seeds + multi-source BFS; walls block, open doors still yield separate rooms).
+3. Match regions to existing room entities (see rules below).
+4. Assign nearby segments in **room-local** meters; set `plan_width` / `plan_depth` / `ceiling_height` and confidence from CAD (**supported** when ≥3 walls).
+
+Config override: [`scripts/cad/apt54-room-match.json`](../scripts/cad/apt54-room-match.json) (or `APT54_ROOM_MATCH=...`). Use `overrides[].bbox` / `overrides[].seed` when auto-match is wrong.
+
+#### Room matching rules
+
+| Priority | Rule |
+| -------- | ---- |
+| 1 | Config `overrides` with `bbox` win for that room name |
+| 2 | Largest region → Living Room |
+| 3 | Remaining region with longest shared boundary with Living → Kitchen (else second-largest) |
+| 4 | Smallest → Walk-in Closet |
+| 5 | Next-smallest → Bathroom |
+| 6 | Remaining by area desc → Master Bedroom, Bedroom 2, Bedroom 3 |
+| 7 | Any still-unmatched room names get leftover regions by area |
+
+Geometry editor / walkthrough work per room (each room has its own `plan_wall` children). Re-running replace deletes prior wall children of matched rooms only.
+
+Limits: not full BIM; openings (`A-DOR` / `A-WIN`) are not auto-detected as entities; wet-room DWGs / OCR out of scope; partition is heuristic (hallway/balcony may appear as extra regions and are dropped when unmatched); shared walls may be duplicated into both rooms.
 
 ### If conversion fails
 
@@ -128,8 +158,8 @@ Export DXF from AutoCAD/TrueView → drop into `public/imports/cad-apt54/` → `
 
 ## Next steps after import
 
-1. Finish Living Room calibration (Plan 1 and/or CAD underlay + CAD walls + real tape dims).
+1. Run `npm run cad:apply-rooms` (or re-import with `APT54_APPLY_ROOMS=1`), then calibrate each room (tape dims + underlay alignment on Living).
 2. Link more construction vs current photos to walls for compare UI.
 3. Attach remaining product docs (kitchen countertops, inspections defects) via Documents on entities.
 4. Capture fresh “current” photos — archive is mostly 2016–2018 construction/handover era.
-5. Optionally split CAD segments into per-room polygons (kitchen, bedrooms) — not automated yet.
+5. Tune `scripts/cad/apt54-room-match.json` overrides if a room mismatch shows up.

@@ -8,12 +8,13 @@
  *   npm run import:apt54
  *   APT54_SOURCE="U:\\...\\Apartment 54" npm run import:apt54
  *   APT54_DRY_RUN=1 npm run import:apt54
- *   APT54_APPLY_WALLS=1 npm run import:apt54   # also upsert geometry from *.walls.json
+ *   APT54_APPLY_WALLS=1 npm run import:apt54   # upsert apartment outline onto Living Room
+ *   APT54_APPLY_ROOMS=1 npm run import:apt54   # split CAD into per-room wall sets
  *
  * Does NOT import: Payments/, sale contracts, bank docs, .p12 certs, other units' plans,
  * or AutoCAD .dwg binaries. Optional CAD underlay SVG (from scripts/cad/) is imported
  * from gitignored public/imports/cad-apt54/ when present. Wall segments → editable
- * plan_wall entities via npm run cad:apply-walls (or APT54_APPLY_WALLS=1).
+ * plan_wall entities via npm run cad:apply-walls / cad:apply-rooms.
  *
  * Re-run deletes/replaces the project named below.
  */
@@ -39,6 +40,7 @@ import {
   applyCadWallsToRoom,
   findLatestWallsJson,
 } from "./apply-cad-walls";
+import { applyCadRoomsToProject } from "./apply-cad-rooms";
 
 const PROJECT_NAME = "Apartment 54 / Neve Yehushua 15";
 
@@ -319,8 +321,11 @@ async function main() {
 
   const cadUnderlayAbs = await findCadUnderlaySvg();
   const cadAsPrimary = process.env.APT54_CAD_PRIMARY === "1";
-  const applyWalls = process.env.APT54_APPLY_WALLS === "1";
-  const wallsJsonAbs = applyWalls ? await findLatestWallsJson() : null;
+  const applyRooms = process.env.APT54_APPLY_ROOMS === "1";
+  const applyWalls =
+    !applyRooms && process.env.APT54_APPLY_WALLS === "1";
+  const wallsJsonAbs =
+    applyWalls || applyRooms ? await findLatestWallsJson() : null;
 
   if (dryRun) {
     console.log(`Would import ${ASSETS.length} assets (no DB writes).`);
@@ -337,7 +342,17 @@ async function main() {
         "  (no CAD underlay — run npm run cad:apt54 then re-import to attach SVG)",
       );
     }
-    if (applyWalls) {
+    if (applyRooms) {
+      if (wallsJsonAbs) {
+        console.log(
+          `  [geometry] Would split CAD walls from ${path.basename(wallsJsonAbs)} → per-room sets`,
+        );
+      } else {
+        console.log(
+          "  (APT54_APPLY_ROOMS=1 but no *.walls.json — run npm run cad:apt54 first)",
+        );
+      }
+    } else if (applyWalls) {
       if (wallsJsonAbs) {
         console.log(
           `  [geometry] Would apply CAD walls from ${path.basename(wallsJsonAbs)} → Living Room`,
@@ -475,9 +490,9 @@ async function main() {
     name: "Walk-in Closet",
   });
 
-  // Stub media wall only when CAD walls are not about to replace all room walls.
+  // Stub media wall only when CAD walls are not about to replace Living Room walls.
   let mediaWall: { id: string } | null = null;
-  if (!(applyWalls && wallsJsonAbs)) {
+  if (!((applyWalls || applyRooms) && wallsJsonAbs)) {
     mediaWall = await insertEntity({
       projectId: project.id,
       parentId: living.id,
@@ -664,7 +679,25 @@ async function main() {
 
   let cadWallsApply: Awaited<ReturnType<typeof applyCadWallsToRoom>> | null =
     null;
-  if (applyWalls) {
+  let cadRoomsApply: Awaited<ReturnType<typeof applyCadRoomsToProject>> | null =
+    null;
+  if (applyRooms) {
+    if (!wallsJsonAbs) {
+      console.warn(
+        "APT54_APPLY_ROOMS=1 but no *.walls.json found; skipping per-room geometry.",
+      );
+    } else {
+      cadRoomsApply = await applyCadRoomsToProject({
+        wallsPath: wallsJsonAbs,
+        projectNameSubstr: PROJECT_NAME,
+        dryRun: false,
+        replace: true,
+      });
+      console.log(
+        `CAD rooms applied: ${cadRoomsApply.rooms.length} rooms from ${cadRoomsApply.regionCount} regions`,
+      );
+    }
+  } else if (applyWalls) {
     if (!wallsJsonAbs) {
       console.warn(
         "APT54_APPLY_WALLS=1 but no *.walls.json found; skipping wall geometry.",
@@ -700,16 +733,19 @@ async function main() {
         primaryPlanEvidenceId,
         cadUnderlayEvidenceId,
         cadWallsApply,
+        cadRoomsApply,
         calibratePath,
         evidenceCount,
         documentCount,
         bytesCopied,
         uploadsDir: `public/uploads/${project.id}/`,
-        note: cadWallsApply
-          ? "CAD walls upserted onto Living Room. Open calibratePath — geometry editor shows editable plan_wall entities."
-          : cadUnderlayEvidenceId
-            ? "CAD underlay attached. Run npm run cad:apply-walls (or APT54_APPLY_WALLS=1) to seed wall geometry from walls.json."
-            : "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
+        note: cadRoomsApply
+          ? "CAD walls split onto per-room entities. Open each room's geometry editor / walkthrough."
+          : cadWallsApply
+            ? "CAD walls upserted onto Living Room. Open calibratePath — geometry editor shows editable plan_wall entities."
+            : cadUnderlayEvidenceId
+              ? "CAD underlay attached. Run npm run cad:apply-rooms (or APT54_APPLY_ROOMS=1) for per-room walls, or cad:apply-walls for Living outline."
+              : "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
       },
       null,
       2,

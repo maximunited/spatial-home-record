@@ -5,6 +5,11 @@ import {
   type RoomScene,
   type WallPlanSegment,
 } from "@/lib/geometry";
+import {
+  buildAnimationBundle,
+  type AnimationAssetFile,
+  type AnimationBundle,
+} from "@/lib/ha-export-animations";
 
 export type HaMapping = {
   entityId: string;
@@ -26,6 +31,9 @@ export type HaExportCamera = {
   canvasHeight?: number;
 };
 
+/** How blind/fan overlays are emitted when `options.animated` is true. */
+export type HaAnimationMode = "custom-cards" | "state-image";
+
 export type HaExportPackage = {
   manifest: {
     version: 1;
@@ -40,6 +48,8 @@ export type HaExportPackage = {
   pictureElementsYaml: string;
   isometricSvg: string;
   mappingsJson: string;
+  /** Binary/text animation assets for the ZIP (`animations/…`). */
+  animationFiles: AnimationAssetFile[];
 };
 
 type EntityLike = {
@@ -170,12 +180,50 @@ function yamlQuote(s: string): string {
   return JSON.stringify(s);
 }
 
+function yamlValue(v: unknown, level: number): string {
+  const pad = "  ".repeat(level);
+  if (v === undefined || v === null) return "";
+  if (typeof v === "string") return yamlQuote(v);
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    if (v.length === 0) return "[]";
+    const lines: string[] = [];
+    for (const item of v) {
+      if (Array.isArray(item)) {
+        lines.push(`${pad}- [${item.map((x) => yamlValue(x, 0)).join(", ")}]`);
+      } else if (item !== null && typeof item === "object") {
+        const nested = indentYaml(item as Record<string, unknown>, level + 1);
+        const nestedLines = nested.split("\n");
+        const first = nestedLines[0] ?? "";
+        lines.push(`${pad}- ${first.trimStart()}`);
+        for (const rest of nestedLines.slice(1)) {
+          lines.push(rest);
+        }
+      } else {
+        lines.push(`${pad}- ${yamlValue(item, 0)}`);
+      }
+    }
+    return `\n${lines.join("\n")}`;
+  }
+  if (typeof v === "object") {
+    return `\n${indentYaml(v as Record<string, unknown>, level)}`;
+  }
+  return JSON.stringify(v);
+}
+
 function indentYaml(obj: Record<string, unknown>, level: number): string {
   const pad = "  ".repeat(level);
   const lines: string[] = [];
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined || v === null) continue;
-    if (typeof v === "object" && !Array.isArray(v)) {
+    if (Array.isArray(v)) {
+      const rendered = yamlValue(v, level + 1);
+      if (rendered.startsWith("\n")) {
+        lines.push(`${pad}${k}:${rendered}`);
+      } else {
+        lines.push(`${pad}${k}: ${rendered}`);
+      }
+    } else if (typeof v === "object") {
       lines.push(`${pad}${k}:`);
       lines.push(indentYaml(v as Record<string, unknown>, level + 1));
     } else if (typeof v === "string") {
@@ -189,6 +237,29 @@ function indentYaml(obj: Record<string, unknown>, level: number): string {
   return lines.join("\n");
 }
 
+function resolveAnimationMode(
+  options?: Record<string, unknown> | null,
+): HaAnimationMode {
+  const raw = options?.animation_mode;
+  if (raw === "state-image" || raw === "custom-cards") return raw;
+  return "custom-cards";
+}
+
+function overlayStyle(
+  pos: { left: string; top: string; width?: string; height?: string },
+  mappingStyle?: Record<string, string | number>,
+  defaults?: Record<string, string | number>,
+): Record<string, string | number> {
+  return {
+    left: pos.left,
+    top: pos.top,
+    ...(defaults ?? {}),
+    ...(mappingStyle ?? {}),
+    ...(pos.width ? { width: pos.width } : {}),
+    ...(pos.height ? { height: pos.height } : {}),
+  };
+}
+
 export function buildPictureElementsYaml(input: {
   title: string;
   imagePath: string;
@@ -198,9 +269,12 @@ export function buildPictureElementsYaml(input: {
     { left: string; top: string; width?: string; height?: string }
   >;
   options?: Record<string, unknown> | null;
+  animations?: AnimationBundle;
 }): string {
   const includeLights = input.options?.include_light_overlays !== false;
   const animated = Boolean(input.options?.animated);
+  const animationMode = resolveAnimationMode(input.options);
+  const animations = input.animations ?? buildAnimationBundle();
 
   const elements: Array<Record<string, unknown>> = [];
 
@@ -211,13 +285,8 @@ export function buildPictureElementsYaml(input: {
       top: "50%",
     };
     const domain = m.haEntityId.split(".")[0] ?? "sensor";
-    const style: Record<string, string | number> = {
-      left: pos.left,
-      top: pos.top,
-      ...(m.style ?? {}),
-    };
+    const style = overlayStyle(pos, m.style);
 
-    // Static state-badge overlays first; blind/fan animation stubs noted in comments.
     if (domain === "light" && includeLights) {
       elements.push({
         type: "state-icon",
@@ -228,24 +297,86 @@ export function buildPictureElementsYaml(input: {
           : { action: "toggle" },
       });
     } else if (domain === "cover") {
-      elements.push({
-        type: "state-icon",
-        entity: m.haEntityId,
-        style,
-        // animation stub: Picture Elements does not animate covers natively
-        tap_action: { action: "more-info" },
-      });
+      if (animated && animationMode === "custom-cards") {
+        elements.push({
+          type: "custom:ha-blinds-frame-card",
+          entity: m.haEntityId,
+          png_path: animations.blind.pngPathPrefix,
+          frames: animations.blind.frameCount,
+          fps: 12,
+          speed: 0.5,
+          // Optional: add animations/blind.webm via ffmpeg (see animations/README.md)
+          src: `${animations.blind.pngPathPrefix.replace(/_$/, "")}.webm`,
+          style: overlayStyle(pos, m.style, {
+            width: "8%",
+            height: "12%",
+            transform: "translate(-50%, -50%)",
+          }),
+        });
+      } else if (animated && animationMode === "state-image") {
+        elements.push({
+          type: "image",
+          entity: m.haEntityId,
+          image: animations.blind.stateImages.open,
+          state_image: {
+            open: animations.blind.stateImages.open,
+            closed: animations.blind.stateImages.closed,
+            opening: animations.blind.stateImages.opening,
+            closing: animations.blind.stateImages.closing,
+          },
+          style: overlayStyle(pos, m.style, {
+            width: "8%",
+            transform: "translate(-50%, -50%)",
+          }),
+          tap_action: { action: "more-info" },
+        });
+      } else {
+        elements.push({
+          type: "state-icon",
+          entity: m.haEntityId,
+          style,
+          tap_action: { action: "more-info" },
+        });
+      }
     } else if (domain === "fan") {
-      elements.push({
-        type: "state-icon",
-        entity: m.haEntityId,
-        style: {
-          ...style,
-          // animation stub marker for future CSS/custom card
-          ...(animated ? { "--ha-export-animate": "spin-stub" } : {}),
-        },
-        tap_action: { action: "toggle" },
-      });
+      if (animated && animationMode === "custom-cards") {
+        elements.push({
+          type: "custom:ha-fan-loop-card",
+          entity: m.haEntityId,
+          png_path: animations.fan.pngPathPrefix,
+          frames: animations.fan.frameCount,
+          fps: 24,
+          src: `${animations.fan.pngPathPrefix.replace(/_$/, "")}.webm`,
+          playMap: animations.fan.playMap,
+          style: overlayStyle(pos, m.style, {
+            width: "7%",
+            height: "7%",
+            transform: "translate(-50%, -50%)",
+          }),
+        });
+      } else if (animated && animationMode === "state-image") {
+        elements.push({
+          type: "image",
+          entity: m.haEntityId,
+          image: animations.fan.stateImages.off,
+          state_image: {
+            on: animations.fan.stateImages.on,
+            off: animations.fan.stateImages.off,
+          },
+          style: overlayStyle(pos, m.style, {
+            width: "7%",
+            transform: "translate(-50%, -50%)",
+          }),
+          tap_action: { action: "toggle" },
+        });
+      } else {
+        elements.push({
+          type: "state-icon",
+          entity: m.haEntityId,
+          style,
+          tap_action: { action: "toggle" },
+        });
+      }
     } else {
       elements.push({
         type: "state-badge",
@@ -264,11 +395,17 @@ export function buildPictureElementsYaml(input: {
     elements,
   };
 
+  const animNote = animated
+    ? animationMode === "custom-cards"
+      ? `# Blind/fan: custom ha-blinds-frame-card / ha-fan-loop-card (position + speed). See animations/README.md.`
+      : `# Blind/fan: stock picture-elements image + state_image keyframes. See animations/README.md.`
+    : `# Blind/fan: state-icon only (set options.animated: true for frame overlays).`;
+
   const header = [
     `# Spatial Home Record — Picture Elements export`,
     `# Title: ${input.title}`,
     `# Credentials are never included. Bind entities in HA after import.`,
-    `# Blind/fan animations are stubs (state-icon only) in v0.`,
+    animNote,
     ``,
     `title: ${yamlQuote(input.title)}`,
     `views:`,
@@ -420,6 +557,7 @@ export function buildHaExportPackage(input: {
     input.entities,
     input.mappings,
   );
+  const animations = buildAnimationBundle();
   const isometricSvg = renderIsometricSvg(scene, camera, overlays);
   const imagePath = "/local/spatial-home-record/isometric.svg";
   const pictureElementsYaml = buildPictureElementsYaml({
@@ -428,6 +566,7 @@ export function buildHaExportPackage(input: {
     mappings: input.mappings,
     overlayPositions: cssPositions,
     options: input.options,
+    animations,
   });
   const mappingsJson = JSON.stringify(
     {
@@ -439,6 +578,10 @@ export function buildHaExportPackage(input: {
     null,
     2,
   );
+
+  const animationPaths = animations.files.map((f) => f.path);
+  const animated = Boolean(input.options?.animated);
+  const animationMode = resolveAnimationMode(input.options);
 
   return {
     manifest: {
@@ -453,16 +596,23 @@ export function buildHaExportPackage(input: {
         "picture-elements.yaml",
         "assets/isometric.svg",
         "mappings.json",
+        ...animationPaths,
       ],
       notes: [
         "Never includes Home Assistant credentials.",
-        "Copy assets/isometric.svg to HA /local/spatial-home-record/ (or update image path).",
-        "Blind/fan animation overlays are stubs in v0.",
+        "Copy assets/isometric.svg and animations/ to HA /config/www/spatial-home-record/.",
+        animated
+          ? animationMode === "custom-cards"
+            ? "Blind/fan use ha-blinds-frame-card / ha-fan-loop-card (PNG sequences; optional WebM via ffmpeg)."
+            : "Blind/fan use picture-elements image + state_image keyframes from animations/."
+          : "Set options.animated: true to emit frame-sequence overlays for covers/fans.",
+        "See animations/README.md for custom-card install and stock PE fallback.",
       ],
     },
     pictureElementsYaml,
     isometricSvg,
     mappingsJson,
+    animationFiles: animations.files,
   };
 }
 

@@ -91,7 +91,19 @@ Rich editable forms (empty generic sections stay hidden; schema-matched sections
 
 ## HA export profiles
 
-`ha_export_profiles.mappings` is an array of `{ entityId, haEntityId, actions?, label? }`. Camera is fixed isometric for v0. Package generation: [`src/lib/ha-export.ts`](../src/lib/ha-export.ts) → ZIP with `manifest.json`, `picture-elements.yaml`, `assets/isometric.svg`, `mappings.json`.
+`ha_export_profiles.mappings` is an array of `{ entityId, haEntityId, actions?, label? }`. Camera is fixed isometric for v0. Package generation: [`src/lib/ha-export.ts`](../src/lib/ha-export.ts) → ZIP with:
+
+| Path | Role |
+| ---- | ---- |
+| `manifest.json` | File list + notes (never credentials) |
+| `picture-elements.yaml` | Lovelace view |
+| `assets/isometric.svg` | Base image |
+| `mappings.json` | Profile mappings + camera/options |
+| `animations/blind_XXX.png` | Cover position frames (0 = open … last = closed) |
+| `animations/fan_XXX.png` | Fan loop frames |
+| `animations/README.md` | Custom-card install + stock PE fallback |
+
+`options.animated: true` (seed default) emits position-based blind + speed-based fan overlays. `options.animation_mode` is `custom-cards` (default: `ha-blinds-frame-card` / `ha-fan-loop-card`) or `state-image` (stock picture-elements keyframes). See [HA-EXPORT.md](HA-EXPORT.md).
 
 ## Security rules
 

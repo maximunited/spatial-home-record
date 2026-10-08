@@ -22,7 +22,7 @@
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
 - `tests/detail-schemas.test.ts` — section matching and field parsing
-- `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package
+- `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG frames in manifest
 - `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/documents/evidence against real Postgres
 
 Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so they no-op locally when the DB is unset.
@@ -49,7 +49,7 @@ npm run test:integration
 2. Open the Living Room room hub — edit plan width/depth/ceiling, wall endpoints, openings
 3. Open Floor Tiles / TV — confirm shared receipt under Documents; open Media Wall — construction vs current compare
 4. Open Socket / Media Cabinet — save detail fields with confidence
-5. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg`
+5. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg` + `animations/blind_000.png` / `fan_000.png`
 
 ## Manual smoke (Apartment 54 plan underlay)
 

@@ -741,7 +741,8 @@ async function main() {
     options: {
       include_light_overlays: true,
       animated: true,
-      note: "Blind/fan animations are stubs in v0",
+      animation_mode: "custom-cards",
+      note: "Blind/fan use PNG frame sequences (ha-blinds-frame-card / ha-fan-loop-card); see animations/README.md",
     },
   });
 

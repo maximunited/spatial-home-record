@@ -68,6 +68,10 @@ export async function GET(
     { path: "picture-elements.yaml", content: pkg.pictureElementsYaml },
     { path: "assets/isometric.svg", content: pkg.isometricSvg },
     { path: "mappings.json", content: pkg.mappingsJson },
+    ...pkg.animationFiles.map((f) => ({
+      path: f.path,
+      content: f.content,
+    })),
   ]);
 
   const filename = `ha-export-${profile.name.replace(/[^a-zA-Z0-9_-]+/g, "-").toLowerCase()}.zip`;

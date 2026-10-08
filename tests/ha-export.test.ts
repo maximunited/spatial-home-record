@@ -7,6 +7,14 @@ import {
   renderIsometricSvg,
   resolveCamera,
 } from "@/lib/ha-export";
+import {
+  BLIND_FRAME_COUNT,
+  FAN_FRAME_COUNT,
+  buildAnimationBundle,
+  encodeRgbaPng,
+  renderBlindFrame,
+  renderFanFrame,
+} from "@/lib/ha-export-animations";
 import { buildRoomScene } from "@/lib/geometry";
 
 describe("ha-export", () => {
@@ -31,6 +39,26 @@ describe("ha-export", () => {
     category: "smart_light",
     name: "Ceiling Light",
     spatialAnchor: { kind: "room" as const, x: 2.1, y: 1.8, z: 2.6 },
+  };
+  const fan = {
+    id: "fan-1",
+    parentId: "room-1",
+    type: "fixture",
+    category: "fan",
+    name: "Ceiling Fan",
+    spatialAnchor: { kind: "room" as const, x: 2.1, y: 1.8, z: 2.5 },
+  };
+  const blind = {
+    id: "blind-1",
+    parentId: "wall-1",
+    type: "fixture",
+    category: "blind",
+    name: "East Blind",
+    spatialAnchor: {
+      kind: "wall_local" as const,
+      u: 1.0,
+      height_affl: 2.2,
+    },
   };
   const attrs = [
     { entityId: "room-1", key: "plan_width", value: 4.2 },
@@ -62,7 +90,7 @@ describe("ha-export", () => {
     expect(svg).toContain("Light");
   });
 
-  it("builds picture elements yaml without secrets", () => {
+  it("builds picture elements yaml with custom-card blind/fan animations", () => {
     const yaml = buildPictureElementsYaml({
       title: "Living Room Isometric",
       imagePath: "/local/spatial-home-record/isometric.svg",
@@ -86,15 +114,47 @@ describe("ha-export", () => {
         ["fan-1", { left: "50%", top: "40%" }],
         ["blind-1", { left: "70%", top: "35%" }],
       ]),
-      options: { include_light_overlays: true, animated: true },
+      options: {
+        include_light_overlays: true,
+        animated: true,
+        animation_mode: "custom-cards",
+      },
     });
     expect(yaml).toContain("type: picture-elements");
     expect(yaml).toContain("light.living_room_ceiling");
     expect(yaml).toContain("fan.living_room");
     expect(yaml).toContain("cover.living_room_blind");
+    expect(yaml).toContain("custom:ha-blinds-frame-card");
+    expect(yaml).toContain("custom:ha-fan-loop-card");
+    expect(yaml).toContain("png_path: /local/spatial-home-record/animations/blind_");
+    expect(yaml).toContain("png_path: /local/spatial-home-record/animations/fan_");
+    expect(yaml).toContain("playMap:");
     expect(yaml).not.toContain("token");
     expect(yaml).not.toContain("password");
-    expect(yaml).toContain("Blind/fan animations are stubs");
+    expect(yaml).toContain("ha-blinds-frame-card / ha-fan-loop-card");
+    expect(yaml).not.toContain("animations are stubs");
+  });
+
+  it("builds stock state-image overlays when animation_mode is state-image", () => {
+    const yaml = buildPictureElementsYaml({
+      title: "Living Room Isometric",
+      imagePath: "/local/spatial-home-record/isometric.svg",
+      mappings: [
+        { entityId: "fan-1", haEntityId: "fan.living_room" },
+        { entityId: "blind-1", haEntityId: "cover.living_room_blind" },
+      ],
+      overlayPositions: new Map([
+        ["fan-1", { left: "50%", top: "40%" }],
+        ["blind-1", { left: "70%", top: "35%" }],
+      ]),
+      options: { animated: true, animation_mode: "state-image" },
+    });
+    expect(yaml).toContain("type: image");
+    expect(yaml).toContain("state_image:");
+    expect(yaml).toContain("blind_000.png");
+    expect(yaml).toContain(`blind_${String(BLIND_FRAME_COUNT - 1).padStart(3, "0")}.png`);
+    expect(yaml).toContain("fan_000.png");
+    expect(yaml).not.toContain("custom:ha-blinds-frame-card");
   });
 
   it("emits cards as a YAML sequence with one picture-elements item", () => {
@@ -129,7 +189,7 @@ describe("ha-export", () => {
     ).toBe(true);
   });
 
-  it("packages zip with manifest and assets", () => {
+  it("packages zip with manifest and animation assets", () => {
     const pkg = buildHaExportPackage({
       projectId: "proj-1",
       profileId: "prof-1",
@@ -141,29 +201,89 @@ describe("ha-export", () => {
           haEntityId: "light.living_room_ceiling",
           label: "Light",
         },
+        {
+          entityId: fan.id,
+          haEntityId: "fan.living_room",
+          label: "Fan",
+        },
+        {
+          entityId: blind.id,
+          haEntityId: "cover.living_room_blind",
+          label: "Blind",
+        },
       ],
-      options: { include_light_overlays: true },
+      options: {
+        include_light_overlays: true,
+        animated: true,
+        animation_mode: "custom-cards",
+      },
       room,
-      entities: [room, wall, light],
+      entities: [room, wall, light, fan, blind],
       attributes: attrs,
     });
 
     expect(pkg.manifest.files).toContain("assets/isometric.svg");
+    expect(pkg.manifest.files).toContain("animations/blind_000.png");
+    expect(pkg.manifest.files).toContain(
+      `animations/blind_${String(BLIND_FRAME_COUNT - 1).padStart(3, "0")}.png`,
+    );
+    expect(pkg.manifest.files).toContain("animations/fan_000.png");
+    expect(pkg.manifest.files).toContain(
+      `animations/fan_${String(FAN_FRAME_COUNT - 1).padStart(3, "0")}.png`,
+    );
+    expect(pkg.manifest.files).toContain("animations/README.md");
     expect(pkg.manifest.notes.some((n) => n.includes("credentials"))).toBe(
       true,
     );
+    expect(pkg.manifest.notes.some((n) => n.includes("stubs"))).toBe(false);
     expect(pkg.isometricSvg).toContain("<svg");
     expect(pkg.pictureElementsYaml).toContain("picture-elements");
+    expect(pkg.pictureElementsYaml).toContain("custom:ha-blinds-frame-card");
+    expect(pkg.animationFiles.length).toBeGreaterThan(BLIND_FRAME_COUNT);
 
     const zip = buildZipStore([
       { path: "manifest.json", content: JSON.stringify(pkg.manifest) },
       { path: "picture-elements.yaml", content: pkg.pictureElementsYaml },
       { path: "assets/isometric.svg", content: pkg.isometricSvg },
       { path: "mappings.json", content: pkg.mappingsJson },
+      ...pkg.animationFiles.map((f) => ({
+        path: f.path,
+        content: f.content,
+      })),
     ]);
     // ZIP local file header signature
     expect(zip[0]).toBe(0x50);
     expect(zip[1]).toBe(0x4b);
-    expect(zip.length).toBeGreaterThan(100);
+    expect(zip.length).toBeGreaterThan(1000);
+  });
+});
+
+describe("ha-export-animations", () => {
+  it("encodes valid PNG signatures for blind and fan frames", () => {
+    const blind = renderBlindFrame(0.5);
+    const fan = renderFanFrame(Math.PI / 4);
+    expect(blind[0]).toBe(0x89);
+    expect(blind[1]).toBe(0x50);
+    expect(fan[0]).toBe(0x89);
+    const tiny = encodeRgbaPng(1, 1, new Uint8Array([255, 0, 0, 255]));
+    expect(tiny.length).toBeGreaterThan(40);
+  });
+
+  it("builds a complete animation bundle with zero-padded names", () => {
+    const bundle = buildAnimationBundle();
+    expect(bundle.blind.frameCount).toBe(BLIND_FRAME_COUNT);
+    expect(bundle.fan.frameCount).toBe(FAN_FRAME_COUNT);
+    expect(bundle.files.some((f) => f.path === "animations/blind_000.png")).toBe(
+      true,
+    );
+    expect(bundle.files.some((f) => f.path === "animations/fan_000.png")).toBe(
+      true,
+    );
+    expect(bundle.files.some((f) => f.path === "animations/README.md")).toBe(
+      true,
+    );
+    expect(bundle.blind.pngPathPrefix).toBe(
+      "/local/spatial-home-record/animations/blind_",
+    );
   });
 });

@@ -300,3 +300,46 @@ export const modelSnapshots = pgTable("model_snapshots", {
     .notNull()
     .defaultNow(),
 });
+
+/** Layer permissions for a private share link. Payments/receipts are never shareable. */
+export type ShareLayerFlags = {
+  walkthrough: boolean;
+  dimensions: boolean;
+  technical: boolean;
+  inventorySummary: boolean;
+};
+
+export const DEFAULT_SHARE_LAYERS: ShareLayerFlags = {
+  walkthrough: true,
+  dimensions: false,
+  technical: false,
+  inventorySummary: false,
+};
+
+export const shareLinks = pgTable(
+  "share_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    /** Unguessable public token (URL path segment). */
+    token: text("token").notNull(),
+    label: text("label"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    /** scrypt hash of optional passcode; null = no passcode. */
+    passcodeHash: text("passcode_hash"),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    layers: jsonb("layers")
+      .$type<ShareLayerFlags>()
+      .notNull()
+      .default(DEFAULT_SHARE_LAYERS),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("share_links_token_uidx").on(t.token),
+    index("share_links_project_idx").on(t.projectId),
+  ],
+);

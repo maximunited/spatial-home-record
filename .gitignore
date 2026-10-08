@@ -34,9 +34,12 @@ yarn-error.log*
 .env*
 !.env.example
 
-# local MVP uploads (seed assets under public/seed/ are committed)
+# private user blobs (auth-gated via /api/blobs) — never commit personal media
+/.data/
+# legacy path — keep ignored if old local trees remain
 /public/uploads/**
 !/public/uploads/.gitkeep
+!/public/uploads/README.md
 
 # personal apartment / private media — never commit
 *.p12

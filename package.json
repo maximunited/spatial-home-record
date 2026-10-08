@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed-living-room-stub.ts",
+    "seed:apt54-capture": "tsx scripts/seed-apt54-current-capture.ts",
     "import:apt54": "tsx scripts/import-apartment-54.ts",
     "cad:dwg": "node scripts/cad/dwg-to-underlay.mjs",
     "cad:dxf": "python scripts/cad/dxf-to-underlay.py",

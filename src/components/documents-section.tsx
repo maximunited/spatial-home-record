@@ -144,7 +144,7 @@ export function DocumentsSection({
           </div>
           <label className="grid gap-1">
             <span className="text-xs text-zinc-500">
-              File (optional — stored under public/uploads)
+              File (optional — stored under .data/uploads, auth-gated)
             </span>
             <input
               type="file"

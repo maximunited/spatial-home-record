@@ -5,7 +5,14 @@ const clerkConfigured = Boolean(
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY,
 );
 
-const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/share(.*)",
+  // Route still auth-gates; share token `?share=` unlocks share-safe uploads only.
+  "/api/blobs(.*)",
+]);
 
 export default clerkConfigured
   ? clerkMiddleware(async (auth, req) => {

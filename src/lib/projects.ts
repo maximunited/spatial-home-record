@@ -294,7 +294,112 @@ export async function listCaptureTasks(projectId: string) {
   return db
     .select()
     .from(captureTasks)
-    .where(eq(captureTasks.projectId, projectId));
+    .where(eq(captureTasks.projectId, projectId))
+    .orderBy(asc(captureTasks.priority), asc(captureTasks.createdAt));
+}
+
+export async function getCaptureTask(taskId: string, projectId: string) {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(captureTasks)
+    .where(
+      and(eq(captureTasks.id, taskId), eq(captureTasks.projectId, projectId)),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+export async function updateCaptureTaskStatus(input: {
+  taskId: string;
+  projectId: string;
+  status: string;
+}) {
+  const db = getDb();
+  const [row] = await db
+    .update(captureTasks)
+    .set({ status: input.status })
+    .where(
+      and(
+        eq(captureTasks.id, input.taskId),
+        eq(captureTasks.projectId, input.projectId),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+export async function insertCaptureTask(input: {
+  projectId: string;
+  entityId?: string | null;
+  title: string;
+  instruction: string;
+  why?: string | null;
+  estimatedMinutes?: number | string | null;
+  status?: string;
+  priority?: number | string | null;
+}) {
+  const db = getDb();
+  const [row] = await db
+    .insert(captureTasks)
+    .values({
+      projectId: input.projectId,
+      entityId: input.entityId ?? null,
+      title: input.title,
+      instruction: input.instruction,
+      why: input.why ?? null,
+      estimatedMinutes:
+        input.estimatedMinutes === null || input.estimatedMinutes === undefined
+          ? null
+          : String(input.estimatedMinutes),
+      status: input.status ?? "open",
+      priority:
+        input.priority === null || input.priority === undefined
+          ? null
+          : String(input.priority),
+    })
+    .returning();
+  return row;
+}
+
+export async function createEvidenceWithLinks(input: {
+  projectId: string;
+  type:
+    | "plan"
+    | "photo"
+    | "video"
+    | "measurement"
+    | "user_confirmation"
+    | "inference"
+    | "scan"
+    | "note";
+  blobId?: string | null;
+  summary?: string | null;
+  metadata?: Record<string, unknown> | null;
+  linkEntityIds: string[];
+}) {
+  const db = getDb();
+  const [row] = await db
+    .insert(evidence)
+    .values({
+      projectId: input.projectId,
+      type: input.type,
+      blobId: input.blobId ?? null,
+      summary: input.summary ?? null,
+      metadata: input.metadata ?? null,
+    })
+    .returning();
+
+  const uniqueIds = [...new Set(input.linkEntityIds.filter(Boolean))];
+  if (uniqueIds.length > 0) {
+    await db.insert(evidenceLinks).values(
+      uniqueIds.map((entityId) => ({
+        evidenceId: row.id,
+        entityId,
+      })),
+    );
+  }
+  return row;
 }
 
 export async function listHaExportProfiles(projectId: string) {

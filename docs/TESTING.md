@@ -23,7 +23,8 @@
 - `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
 - `tests/detail-schemas.test.ts` — section matching and field parsing
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG frames in manifest
-- `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/documents/evidence against real Postgres
+- `tests/share-redaction.test.ts` — layer defaults, payment redaction, share-safe evidence, passcode helpers
+- `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/documents/evidence/share links against real Postgres
 
 Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so they no-op locally when the DB is unset.
 
@@ -32,7 +33,7 @@ Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so th
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
 1. **unit** — `lint`, `typecheck`, `test:unit`, `build`
-2. **integration** — Postgres 16 service, apply `drizzle/0000_init_spatial_schema.sql`, `test:integration`
+2. **integration** — Postgres 16 service, apply `drizzle/0000_init_spatial_schema.sql` + `drizzle/0001_share_links.sql`, `test:integration`
 
 ## Local integration setup
 

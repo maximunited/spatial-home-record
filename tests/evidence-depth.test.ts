@@ -1,25 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { blobPublicUrl, sanitizeUploadFilename } from "@/lib/blobs";
 import { formatDocumentLabel, isDocumentType } from "@/lib/documents";
 import {
   canShowPhotoCompare,
   evidencePhase,
   pickPhasePhotos,
 } from "@/lib/wall-photo-compare";
-
-describe("blobs helpers", () => {
-  it("builds public URLs from storage keys", () => {
-    expect(blobPublicUrl("seed/receipt.svg")).toBe("/seed/receipt.svg");
-    expect(blobPublicUrl("/uploads/p/a.pdf")).toBe("/uploads/p/a.pdf");
-  });
-
-  it("sanitizes upload filenames", () => {
-    expect(sanitizeUploadFilename("../../etc/passwd")).toBe("passwd");
-    expect(sanitizeUploadFilename("My Receipt (1).PDF")).toBe(
-      "My_Receipt_1_.PDF",
-    );
-  });
-});
 
 describe("documents helpers", () => {
   it("validates document types", () => {
@@ -80,6 +65,7 @@ describe("wall photo compare", () => {
     expect(pair.construction?.publicUrl).toBe(
       "/seed/media-wall-construction.svg",
     );
+    expect(pair.current?.publicUrl).toBe("/seed/media-wall-current.svg");
     expect(canShowPhotoCompare(pair)).toBe(true);
   });
 

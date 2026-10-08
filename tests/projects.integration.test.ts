@@ -26,6 +26,14 @@ import { buildRoomScene } from "@/lib/geometry";
 import { buildHaExportPackage } from "@/lib/ha-export";
 import { getDb } from "@/db/client";
 import { evidence, evidenceLinks, haExportProfiles } from "@/db/schema";
+import {
+  createShareLink,
+  isShareLinkActive,
+  listShareLinksForProject,
+  loadShareView,
+  revokeShareLink,
+  verifySharePasscode,
+} from "@/lib/share-links";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -366,6 +374,77 @@ describe.runIf(hasDb)("projects integration", () => {
       expect(pair.construction?.id).toBe(construction.id);
       expect(pair.current?.id).toBe(current.id);
       expect(pair.construction?.publicUrl).toContain("construction");
+    },
+    30_000,
+  );
+
+  it(
+    "creates share links with layer flags, redacts docs, and revokes",
+    async () => {
+      const project = await createProject({
+        name: `Share Test ${Date.now()}`,
+      });
+      const room = await insertEntity({
+        projectId: project.id,
+        type: "room",
+        name: "Share Room",
+      });
+      await upsertAttribute({
+        entityId: room.id,
+        key: "plan_width",
+        value: 5,
+        units: "m",
+        confidence: "supported",
+      });
+      await upsertAttribute({
+        entityId: room.id,
+        key: "purchase_price",
+        value: 999,
+        units: "EUR",
+        confidence: "confirmed",
+      });
+
+      const link = await createShareLink({
+        projectId: project.id,
+        label: "Guest walkthrough",
+        passcode: "correct-horse",
+        layers: {
+          walkthrough: true,
+          dimensions: true,
+          technical: false,
+          inventorySummary: false,
+        },
+        expiresAt: new Date(Date.now() + 86400_000),
+      });
+
+      expect(link.token.length).toBeGreaterThan(20);
+      expect(link.passcodeHash).toBeTruthy();
+      expect(verifySharePasscode("correct-horse", link.passcodeHash)).toBe(
+        true,
+      );
+      expect(verifySharePasscode("nope", link.passcodeHash)).toBe(false);
+
+      const listed = await listShareLinksForProject(project.id);
+      expect(listed.some((l) => l.id === link.id)).toBe(true);
+      expect(isShareLinkActive(link)).toBe(true);
+
+      const view = await loadShareView(link.token);
+      expect(view).not.toBeNull();
+      expect(view?.view.documents).toEqual([]);
+      expect(
+        view?.view.attributes.some((a) => a.key === "plan_width"),
+      ).toBe(true);
+      expect(
+        view?.view.attributes.some((a) => a.key === "purchase_price"),
+      ).toBe(false);
+      expect(view?.view.layers.dimensions).toBe(true);
+
+      const revoked = await revokeShareLink({
+        shareLinkId: link.id,
+        projectId: project.id,
+      });
+      expect(revoked?.revokedAt).toBeTruthy();
+      expect(await loadShareView(link.token)).toBeNull();
     },
     30_000,
   );

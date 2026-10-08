@@ -28,17 +28,46 @@ import {
   planUnderlayAttributeKey,
 } from "@/lib/plan-underlay";
 import {
+  createEvidenceWithLinks,
   createProject,
+  getCaptureTask,
   getEntityBundle,
   insertEntity,
+  updateCaptureTaskStatus,
   updateEntitySpatialAnchor,
   updateHaExportProfile,
   upsertAttribute,
 } from "@/lib/projects";
+import {
+  createShareLink,
+  getShareLinkByToken,
+  isShareLinkActive,
+  revokeShareLink,
+  shareUnlockCookieName,
+  shareUnlockCookieValue,
+  verifySharePasscode,
+} from "@/lib/share-links";
+import { normalizeShareLayers } from "@/lib/share-redaction";
+import {
+  assertCanAccessPrivateBlobs,
+  UploadAuthError,
+} from "@/lib/upload-auth";
+import { cookies } from "next/headers";
 
 function requireDb() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not configured");
+  }
+}
+
+async function requireUploadAuth() {
+  try {
+    await assertCanAccessPrivateBlobs();
+  } catch (err) {
+    if (err instanceof UploadAuthError) {
+      throw new Error(err.message);
+    }
+    throw err;
   }
 }
 
@@ -542,6 +571,7 @@ export async function attachDocumentAction(formData: FormData) {
   let originalBlobId: string | null = null;
   const file = formData.get("file");
   if (file instanceof File && file.size > 0) {
+    await requireUploadAuth();
     const bytes = Buffer.from(await file.arrayBuffer());
     const blob = await writeLocalBlob({
       projectId,
@@ -594,6 +624,66 @@ export async function linkExistingDocumentAction(formData: FormData) {
   revalidateProjectPaths(projectId, entityId, returnTo);
 }
 
+export async function completeCaptureTaskAction(formData: FormData) {
+  requireDb();
+  await requireUploadAuth();
+
+  const projectId = String(formData.get("projectId") ?? "");
+  const taskId = String(formData.get("taskId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+
+  if (!projectId || !taskId) throw new Error("Missing projectId or taskId");
+
+  const task = await getCaptureTask(taskId, projectId);
+  if (!task) throw new Error("Capture task not found");
+  if (task.status === "done") {
+    throw new Error("Capture task already completed");
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size <= 0) {
+    throw new Error("Photo file required — shoot in the apartment, then upload");
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const blob = await writeLocalBlob({
+    projectId,
+    filename: file.name || "current-photo.jpg",
+    bytes,
+    contentType: file.type || "image/jpeg",
+  });
+
+  const linkIds = task.entityId ? [task.entityId] : [];
+  await createEvidenceWithLinks({
+    projectId,
+    type: "photo",
+    blobId: blob.id,
+    summary: task.title,
+    metadata: {
+      phase: "current",
+      capture_task_id: task.id,
+      requires_irl: true,
+      source: "capture_checklist",
+    },
+    linkEntityIds: linkIds,
+  });
+
+  await updateCaptureTaskStatus({
+    taskId: task.id,
+    projectId,
+    status: "done",
+  });
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/capture`);
+  if (task.entityId) {
+    revalidatePath(`/projects/${projectId}/rooms/${task.entityId}`);
+    revalidatePath(`/projects/${projectId}/walls/${task.entityId}`);
+    revalidatePath(`/projects/${projectId}/entities/${task.entityId}`);
+  }
+  if (returnTo) revalidatePath(returnTo);
+}
+
 function revalidateProjectPaths(
   projectId: string,
   entityId: string,
@@ -606,4 +696,96 @@ function revalidateProjectPaths(
   revalidatePath(`/projects/${projectId}/export/ha`);
   revalidatePath(`/projects/${projectId}/walkthrough`);
   if (returnTo) revalidatePath(returnTo);
+}
+
+export async function createShareLinkAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  if (!projectId) throw new Error("Missing projectId");
+
+  const label = String(formData.get("label") ?? "").trim() || null;
+  const passcode = String(formData.get("passcode") ?? "").trim() || null;
+  const expiresDaysRaw = String(formData.get("expiresDays") ?? "").trim();
+  let expiresAt: Date | null = null;
+  if (expiresDaysRaw) {
+    const days = Number(expiresDaysRaw);
+    if (!Number.isFinite(days) || days <= 0 || days > 3650) {
+      throw new Error("expiresDays must be between 1 and 3650");
+    }
+    expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  }
+
+  const layers = normalizeShareLayers({
+    walkthrough: formData.get("layerWalkthrough") === "on",
+    dimensions: formData.get("layerDimensions") === "on",
+    technical: formData.get("layerTechnical") === "on",
+    inventorySummary: formData.get("layerInventory") === "on",
+  });
+
+  // At least one layer required
+  if (
+    !layers.walkthrough &&
+    !layers.dimensions &&
+    !layers.technical &&
+    !layers.inventorySummary
+  ) {
+    layers.walkthrough = true;
+  }
+
+  const link = await createShareLink({
+    projectId,
+    label,
+    expiresAt,
+    passcode,
+    layers,
+  });
+
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}?shareCreated=${link.token}`);
+}
+
+export async function revokeShareLinkAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const shareLinkId = String(formData.get("shareLinkId") ?? "");
+  if (!projectId || !shareLinkId) {
+    throw new Error("Missing projectId or shareLinkId");
+  }
+
+  await revokeShareLink({ shareLinkId, projectId });
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
+}
+
+export async function unlockSharePasscodeAction(formData: FormData) {
+  requireDb();
+  const token = String(formData.get("token") ?? "").trim();
+  const passcode = String(formData.get("passcode") ?? "");
+  if (!token) throw new Error("Missing token");
+
+  const link = await getShareLinkByToken(token);
+  if (!link || !isShareLinkActive(link)) {
+    redirect(`/share/${token}?error=invalid`);
+  }
+
+  if (!verifySharePasscode(passcode, link.passcodeHash)) {
+    redirect(`/share/${token}?error=passcode`);
+  }
+
+  if (link.passcodeHash) {
+    const jar = await cookies();
+    jar.set(
+      shareUnlockCookieName(token),
+      shareUnlockCookieValue(token, link.passcodeHash),
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: `/share/${token}`,
+        maxAge: 60 * 60 * 12,
+      },
+    );
+  }
+
+  redirect(`/share/${token}`);
 }

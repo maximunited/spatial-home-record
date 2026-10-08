@@ -33,7 +33,7 @@ If a CAD underlay exists at `public/imports/cad-apt54/*.underlay.svg` (see [CAD 
 # Preview file list (no DB)
 APT54_DRY_RUN=1 npm run import:apt54
 
-# Import into DATABASE_URL (writes public/uploads/{projectId}/)
+# Import into DATABASE_URL (writes .data/uploads/{projectId}/)
 npm run import:apt54
 
 # Import with CAD SVG as default underlay (after npm run cad:apt54)
@@ -50,10 +50,13 @@ Re-running deletes and recreates the project named **Apartment 54 / Neve Yehushu
 
 ## Privacy
 
-- Files land under `public/uploads/` (gitignored). Do not commit personal media.
+- Files land under `.data/uploads/` (gitignored) and are served only via auth-gated `/api/blobs/…`. Do not commit personal media.
+- Migrating an older `public/uploads/` tree: see [BLOB-STORAGE.md](BLOB-STORAGE.md).
 - CAD intermediates under `public/imports/cad-apt54/` are also gitignored.
 - Treat evidence photos and PDFs as private home data (faces, address, amounts may appear).
 - Do not push uploads, imports, or `.env` to GitHub.
+
+Local uploads require Clerk **or** `ALLOW_UNAUTHENTICATED_UPLOADS=1` (see `.env.example`).
 
 ## Calibrate Living Room from Plan 1
 
@@ -127,30 +130,39 @@ Or in one import pass: `APT54_APPLY_ROOMS=1 npm run import:apt54` (takes precede
 
 **Outline helpers** ([`src/lib/cad-walls.ts`](../src/lib/cad-walls.ts)): filter structural layers, drop short noise, snap to 5 cm, merge colinear runs, propose `plan_wall` anchors with confidence **supported** (outline/all) or **estimated** (aabb).
 
-**Per-room helpers** ([`src/lib/cad-rooms.ts`](../src/lib/cad-rooms.ts)):
+**Per-room helpers** ([`src/lib/cad-rooms.ts`](../src/lib/cad-rooms.ts) + [`src/lib/cad-openings.ts`](../src/lib/cad-openings.ts)):
 
 1. Optional double-line → centerline collapse.
 2. Partition open space (distance-to-wall seeds + multi-source BFS; walls block, open doors still yield separate rooms).
-3. Match regions to existing room entities (see rules below).
-4. Assign nearby segments in **room-local** meters; set `plan_width` / `plan_depth` / `ceiling_height` and confidence from CAD (**supported** when ≥3 walls).
+3. Match regions to existing room entities (hallway/balcony-aware; see rules below).
+4. Assign nearby segments in **room-local** meters; dedupe near-identical walls within a room.
+5. Annotate shared partitions across rooms (`shared_wall_key`) — see model below.
+6. Detect `A-DOR` / `A-WIN*` openings, cluster fragments, place on nearest wall with `wall_local` `u` + confidence; insert as opening children of those walls.
 
-Config override: [`scripts/cad/apt54-room-match.json`](../scripts/cad/apt54-room-match.json) (or `APT54_ROOM_MATCH=...`). Use `overrides[].bbox` / `overrides[].seed` when auto-match is wrong.
+Config override: [`scripts/cad/apt54-room-match.json`](../scripts/cad/apt54-room-match.json) (or `APT54_ROOM_MATCH=...`). Use `overrides[].bbox` / `overrides[].seed` when auto-match is wrong. `openings.enabled` / `sharedWalls.*` tune detection.
 
 #### Room matching rules
 
 | Priority | Rule |
 | -------- | ---- |
 | 1 | Config `overrides` with `bbox` win for that room name |
-| 2 | Largest region → Living Room |
-| 3 | Remaining region with longest shared boundary with Living → Kitchen (else second-largest) |
-| 4 | Smallest → Walk-in Closet |
-| 5 | Next-smallest → Bathroom |
-| 6 | Remaining by area desc → Master Bedroom, Bedroom 2, Bedroom 3 |
-| 7 | Any still-unmatched room names get leftover regions by area |
+| 2 | Largest ordinary region → Living Room |
+| 3 | Remaining ordinary region with longest shared boundary with Living → Kitchen (else second-largest) |
+| 4 | If Hallway / Balcony room names exist: elongated corridor → Hallway; exterior-edge modest region → Balcony |
+| 5 | Smallest ordinary → Walk-in Closet |
+| 6 | Next-smallest ordinary → Bathroom |
+| 7 | Remaining ordinary by area desc → Master Bedroom, Bedroom 2, Bedroom 3 |
+| 8 | Still-unmatched names get leftover regions (corridors skipped when `skipCorridorClasses` is true, default) |
 
-Geometry editor / walkthrough work per room (each room has its own `plan_wall` children). Re-running replace deletes prior wall children of matched rooms only.
+Hallway/balcony **classification** still runs when those room entities are absent — classified regions are simply not used for bedroom/wet matching so they do not steal slots.
 
-Limits: not full BIM; openings (`A-DOR` / `A-WIN`) are not auto-detected as entities; wet-room DWGs / OCR out of scope; partition is heuristic (hallway/balcony may appear as extra regions and are dropped when unmatched); shared walls may be duplicated into both rooms.
+#### Shared-wall model (duplicate OK)
+
+Each room keeps its own `wall` entities in **room-local** coordinates so the geometry editor / openings stay per-room. When the same apartment-space partition is assigned to two rooms, both walls are kept and linked with attribute `shared_wall_key` (same string). We do **not** collapse to a single shared wall entity (that would break per-room `wall_local` openings and editing). Cleanup only removes near-duplicate segments **within** one room.
+
+Geometry editor / walkthrough work per room (each room has its own `plan_wall` children). Re-running replace deletes prior wall children (and their openings) of matched rooms only.
+
+Limits: not full BIM; door/window CAD is fragment-based (swing arcs / sill ticks) so widths and placement are heuristic; default door/window heights/sills are estimated; wet-room DWGs / OCR out of scope; partition remains heuristic; balcony vs exterior room can misclassify without overrides.
 
 ### If conversion fails
 
@@ -159,7 +171,7 @@ Export DXF from AutoCAD/TrueView → drop into `public/imports/cad-apt54/` → `
 ## Next steps after import
 
 1. Run `npm run cad:apply-rooms` (or re-import with `APT54_APPLY_ROOMS=1`), then calibrate each room (tape dims + underlay alignment on Living).
-2. Link more construction vs current photos to walls for compare UI.
-3. Attach remaining product docs (kitchen countertops, inspections defects) via Documents on entities.
-4. Capture fresh “current” photos — archive is mostly 2016–2018 construction/handover era.
+2. Shoot fresh **current** photos IRL and complete capture tasks — see [CURRENT-PHOTOS.md](CURRENT-PHOTOS.md) (`/projects/{id}/capture`, or `npm run seed:apt54-capture` if tasks are missing).
+3. Link more construction vs current photos to walls for compare UI.
+4. Attach remaining product docs (kitchen countertops, inspections defects) via Documents on entities.
 5. Tune `scripts/cad/apt54-room-match.json` overrides if a room mismatch shows up.

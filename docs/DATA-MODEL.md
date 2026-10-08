@@ -10,15 +10,16 @@ Source of truth is Postgres (Neon or local; CI uses Postgres 16). The app connec
 | `entities` | Typed hierarchy nodes + optional spatial anchor JSON |
 | `entity_attributes` | Key/value with **per-attribute** confidence |
 | `evidence` / `evidence_links` | Plans, photos, measurements, confirmations |
-| `blobs` | Object-storage pointers — MVP writes under `public/` (see [BLOB-STORAGE.md](BLOB-STORAGE.md)) |
+| `blobs` | Object-storage pointers — user files under `.data/uploads` (see [BLOB-STORAGE.md](BLOB-STORAGE.md)) |
 | `documents` / `document_links` | Receipts, manuals, invoices (many entities per document) |
 | `relationships` | Typed edges (`powered_by`, `stored_inside`, …) |
 | `measurements` | Dimension values with endpoints |
 | `capture_tasks` | Guided capture checklist items |
 | `ha_export_profiles` | Entity↔HA mappings + camera (no credentials) |
 | `model_snapshots` | Versioned scene snapshots |
+| `share_links` | Private share tokens, optional passcode hash, expiry, layer flags |
 
-Schema lives in [`src/db/schema.ts`](../src/db/schema.ts). SQL migration: [`drizzle/0000_init_spatial_schema.sql`](../drizzle/0000_init_spatial_schema.sql).
+Schema lives in [`src/db/schema.ts`](../src/db/schema.ts). SQL migrations: [`drizzle/0000_init_spatial_schema.sql`](../drizzle/0000_init_spatial_schema.sql), [`drizzle/0001_share_links.sql`](../drizzle/0001_share_links.sql).
 
 ## Confidence
 
@@ -42,7 +43,7 @@ Walls use plan-space endpoints:
 }
 ```
 
-Room dimensions live on the room entity as attributes: `plan_width`, `plan_depth`, `ceiling_height` (meters). Geometry helpers: [`src/lib/geometry.ts`](../src/lib/geometry.ts). CAD `*.walls.json` → simplified `plan_wall` proposals: [`src/lib/cad-walls.ts`](../src/lib/cad-walls.ts) (`npm run cad:apply-walls` for Living outline) or per-room split [`src/lib/cad-rooms.ts`](../src/lib/cad-rooms.ts) (`npm run cad:apply-rooms`).
+Room dimensions live on the room entity as attributes: `plan_width`, `plan_depth`, `ceiling_height` (meters). Geometry helpers: [`src/lib/geometry.ts`](../src/lib/geometry.ts). CAD `*.walls.json` → simplified `plan_wall` proposals: [`src/lib/cad-walls.ts`](../src/lib/cad-walls.ts) (`npm run cad:apply-walls` for Living outline) or per-room split [`src/lib/cad-rooms.ts`](../src/lib/cad-rooms.ts) (`npm run cad:apply-rooms`). Openings from `A-DOR` / `A-WIN*` layers: [`src/lib/cad-openings.ts`](../src/lib/cad-openings.ts). Shared partitions across rooms keep **duplicate wall entities** (one per room) linked by optional `shared_wall_key` — not a single shared entity.
 
 Plan calibration underlay (optional JSON attribute `plan_underlay` on the room): `{ evidenceId, opacity, scale, offsetX, offsetY }` with per-attribute confidence (**measured** UI label ↔ `confirmed`/`supported`; **estimated** ↔ `estimated`/`unknown`). Primary plan evidence may set `metadata.role = primary_plan`. Helpers: [`src/lib/plan-underlay.ts`](../src/lib/plan-underlay.ts).
 
@@ -105,8 +106,13 @@ Rich editable forms (empty generic sections stay hidden; schema-matched sections
 
 `options.animated: true` (seed default) emits position-based blind + speed-based fan overlays. `options.animation_mode` is `custom-cards` (default: `ha-blinds-frame-card` / `ha-fan-loop-card`) or `state-image` (stock picture-elements keyframes). See [HA-EXPORT.md](HA-EXPORT.md).
 
+## Share links
+
+`share_links.layers` JSON: `{ walkthrough, dimensions, technical, inventorySummary }`. Payments/receipts are **not** a layer — the public viewer never returns documents or payment attributes. See [SHARE-LINKS.md](SHARE-LINKS.md).
+
 ## Security rules
 
 - Projects are private by default.
 - Never store Home Assistant tokens in the DB or export packages.
 - Do not commit `.env` (only `.env.example`).
+- Share passcodes are scrypt-hashed; never store plaintext passcodes or commit share tokens.

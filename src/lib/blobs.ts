@@ -4,23 +4,73 @@ import path from "node:path";
 import { getDb } from "@/db/client";
 import { blobs } from "@/db/schema";
 
-/** Root under which MVP files live (served by Next from `public/`). */
+/** Committed seed assets under Next `public/` (world-readable). */
 export const PUBLIC_DIR = path.join(process.cwd(), "public");
 
 /**
- * MVP blob storage: files under `public/` (no AWS required).
- * - Seeded demos: `public/seed/...` → storageKey `seed/...`
- * - User uploads: `public/uploads/{projectId}/...` → storageKey `uploads/{projectId}/...`
+ * Private user uploads live outside `public/` so Next never static-serves them.
+ * Absolute root: `<cwd>/.data` — storage keys still start with `uploads/…`.
+ */
+export const DATA_DIR = path.join(process.cwd(), ".data");
+
+/**
+ * Blob storage:
+ * - Seeded demos: `public/seed/...` → storageKey `seed/...` → URL `/seed/...`
+ * - User uploads: `.data/uploads/{projectId}/...` → storageKey `uploads/{projectId}/...`
+ *   → URL `/api/blobs/uploads/...` (auth-gated)
  * Swap `writeLocalBlob` for S3 later; keep `blobs.storage_key` as the portable pointer.
  */
-export function blobPublicUrl(storageKey: string): string {
-  const cleaned = storageKey.replace(/^\/+/, "");
-  return `/${cleaned}`;
+
+/** Normalize and reject path traversal in storage keys. */
+export function cleanStorageKey(storageKey: string): string {
+  const cleaned = storageKey.replace(/^\/+/, "").replace(/\\/g, "/");
+  if (!cleaned || cleaned.includes("..") || path.isAbsolute(cleaned)) {
+    throw new Error("Invalid storage key");
+  }
+  return cleaned;
 }
 
+export function isPrivateUploadKey(storageKey: string): boolean {
+  return cleanStorageKey(storageKey).startsWith("uploads/");
+}
+
+export function isPublicSeedKey(storageKey: string): boolean {
+  return cleanStorageKey(storageKey).startsWith("seed/");
+}
+
+/**
+ * Browser URL for a blob. Seed assets stay static; user uploads go through
+ * the authenticated `/api/blobs/…` route (cookies / Clerk session).
+ */
+export function blobPublicUrl(storageKey: string): string {
+  const cleaned = cleanStorageKey(storageKey);
+  if (cleaned.startsWith("seed/")) {
+    return `/${cleaned}`;
+  }
+  return `/api/blobs/${cleaned}`;
+}
+
+/** Absolute filesystem path for a storage key. */
 export function localBlobAbsolutePath(storageKey: string): string {
-  const cleaned = storageKey.replace(/^\/+/, "").replace(/\.\./g, "");
+  const cleaned = cleanStorageKey(storageKey);
+  if (cleaned.startsWith("uploads/")) {
+    return path.join(DATA_DIR, ...cleaned.split("/"));
+  }
+  // seed/ and any other legacy public keys
   return path.join(PUBLIC_DIR, ...cleaned.split("/"));
+}
+
+/**
+ * Resolve a request path under `/api/blobs/` to a storage key.
+ * Only `uploads/…` keys are served from `.data` via this API.
+ */
+export function storageKeyFromApiPath(segments: string[]): string {
+  const joined = segments.map((s) => s.trim()).filter(Boolean).join("/");
+  const cleaned = cleanStorageKey(joined);
+  if (!cleaned.startsWith("uploads/")) {
+    throw new Error("Only private upload keys are served via /api/blobs");
+  }
+  return cleaned;
 }
 
 export function sanitizeUploadFilename(name: string): string {
@@ -40,7 +90,7 @@ export async function insertBlobRecord(input: {
     .insert(blobs)
     .values({
       projectId: input.projectId,
-      storageKey: input.storageKey,
+      storageKey: cleanStorageKey(input.storageKey),
       contentType: input.contentType ?? null,
       byteSize:
         input.byteSize === null || input.byteSize === undefined
@@ -52,7 +102,7 @@ export async function insertBlobRecord(input: {
   return row;
 }
 
-/** Write bytes under `public/uploads/{projectId}/` and insert a blobs row. */
+/** Write bytes under `.data/uploads/{projectId}/` and insert a blobs row. */
 export async function writeLocalBlob(input: {
   projectId: string;
   filename: string;

@@ -8,6 +8,13 @@
       "when": 1791307317046,
       "tag": "0000_init_spatial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791460000000,
+      "tag": "0001_share_links",
+      "breakpoints": true
     }
   ]
 }

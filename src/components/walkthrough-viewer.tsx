@@ -26,6 +26,8 @@ export type WalkthroughViewerProps = {
   selectedEntityId: string | null;
   onSelectEntity: (entityId: string | null) => void;
   planHref: string;
+  /** Public share viewer: no links into private project routes or documents. */
+  shareMode?: boolean;
 };
 
 function SelectableBox({
@@ -261,6 +263,7 @@ export function WalkthroughViewer({
   selectedEntityId,
   onSelectEntity,
   planHref,
+  shareMode = false,
 }: WalkthroughViewerProps) {
   const [controlMode, setControlMode] = useState<"orbit" | "walk">("orbit");
   const selected = useMemo(
@@ -312,12 +315,18 @@ export function WalkthroughViewer({
               Walk
             </button>
           </div>
-          <Link
-            href={planHref}
-            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-800 hover:bg-zinc-50"
-          >
-            Top-down / geometry editor
-          </Link>
+          {!shareMode ? (
+            <Link
+              href={planHref}
+              className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-800 hover:bg-zinc-50"
+            >
+              Top-down / geometry editor
+            </Link>
+          ) : (
+            <span className="rounded border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
+              Shared view · redacted
+            </span>
+          )}
         </div>
       </div>
 
@@ -370,7 +379,9 @@ export function WalkthroughViewer({
               </p>
             ) : null}
             <p className="mt-1 text-zinc-400">
-              Privacy: private project · no HA credentials in scene.
+              {shareMode
+                ? "Shared redacted view · no documents or receipts."
+                : "Privacy: private project · no HA credentials in scene."}
             </p>
           </div>
           {selected ? (
@@ -385,15 +396,19 @@ export function WalkthroughViewer({
                   {selectedHotspot.summary}
                 </p>
               ) : null}
-              <Link
-                href={`${entityHref(projectId, selected)}?from=walkthrough`}
-                className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline"
-              >
-                Open detail →
-              </Link>
-              <p className="mt-1 font-mono text-[10px] text-zinc-400">
-                {selected.id}
-              </p>
+              {!shareMode ? (
+                <Link
+                  href={`${entityHref(projectId, selected)}?from=walkthrough`}
+                  className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline"
+                >
+                  Open detail →
+                </Link>
+              ) : null}
+              {!shareMode ? (
+                <p className="mt-1 font-mono text-[10px] text-zinc-400">
+                  {selected.id}
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="text-xs text-zinc-500">

@@ -12,19 +12,21 @@ Evidence-backed spatial home record: structured apartment entities with per-attr
 - Detail forms for floor tiles, TV, wall tech points, cabinet inventory
 - HA export v0: fixed isometric SVG → downloadable Picture Elements package
 - **3D walkthrough** — React Three Fiber orbit/walk viewer from parametric plan geometry; mesh selection opens detail panel; photo hotspots; link to top-down geometry editor
-- **Documents / receipts** — attach and multi-link receipts to entities; local `public/uploads` blobs (no AWS); seed receipt on TV + floor tiles
+- **Documents / receipts** — attach and multi-link receipts to entities; private `.data/uploads` blobs via auth-gated `/api/blobs` (no AWS); seed receipt on TV + floor tiles
 - **Wall photo compare** — construction vs current evidence on wall workspace
+- **Current-photo capture** — Apt 54 room checklist; IRL shoot then upload as `phase: current` ([docs/CURRENT-PHOTOS.md](docs/CURRENT-PHOTOS.md))
+- **Private share links** — `/share/[token]` with layer permissions; documents/payments never included ([docs/SHARE-LINKS.md](docs/SHARE-LINKS.md))
 - CI: unit + Postgres integration
 
 ## Setup
 
 1. Copy `.env.example` to `.env` and set `DATABASE_URL` (Neon recommended).
 2. `npm install`
-3. Apply schema: `npx drizzle-kit push` **or** `psql "$DATABASE_URL" -f drizzle/0000_init_spatial_schema.sql`
+3. Apply schema: `npx drizzle-kit push` **or** `psql "$DATABASE_URL" -f drizzle/0000_init_spatial_schema.sql` then `drizzle/0001_share_links.sql`
 4. `npm run seed` (Living Room Pilot with calibrated plan + HA mappings)
 5. `npm run dev`
 
-Clerk keys are optional; without them, routes are open for local development.
+Clerk keys are optional for page routes in local development. Private uploads require Clerk **or** `ALLOW_UNAUTHENTICATED_UPLOADS=1` (see `.env.example`).
 
 ## Scripts
 
@@ -37,7 +39,8 @@ Clerk keys are optional; without them, routes are open for local development.
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint |
 | `npm run seed` | Living-room pilot project |
-| `npm run import:apt54` | Local Apartment 54 import (gitignored uploads) |
+| `npm run seed:apt54-capture` | Seed current-photo capture tasks for Apt 54 |
+| `npm run import:apt54` | Local Apartment 54 import (gitignored `.data/uploads`) |
 | `npm run cad:apply-walls` | Upsert CAD `*.walls.json` → Living Room `plan_wall` entities |
 | `npm run db:push` | Push Drizzle schema |
 

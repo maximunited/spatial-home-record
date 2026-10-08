@@ -2,7 +2,7 @@
  * One-off local import: Neve Yehushua 15 / Apartment 54 → Spatial Home Record.
  *
  * Copies a curated subset of personal apartment files into gitignored
- * `public/uploads/{projectId}/` and creates project/entity/evidence/document rows.
+ * `.data/uploads/{projectId}/` and creates project/entity/evidence/document rows.
  *
  * Usage:
  *   npm run import:apt54
@@ -29,8 +29,13 @@ import {
   localBlobAbsolutePath,
   sanitizeUploadFilename,
 } from "../src/lib/blobs";
+import {
+  buildApt54CurrentPhotoCaptureSpecs,
+  captureTaskMetadata,
+} from "../src/lib/capture-current-photos";
 import { createDocument } from "../src/lib/documents";
 import {
+  insertCaptureTask,
   insertEntity,
   insertRelationship,
   upsertAttribute,
@@ -716,6 +721,36 @@ async function main() {
     }
   }
 
+  const roomEntities = [
+    living,
+    kitchen,
+    master,
+    bedroom2,
+    bedroom3,
+    bath,
+    closet,
+  ];
+  const roomByName = new Map(
+    roomEntities.map((r) => [r.name.toLowerCase(), r] as const),
+  );
+  let captureTaskCount = 0;
+  for (const spec of buildApt54CurrentPhotoCaptureSpecs()) {
+    const room = roomByName.get(spec.roomName.toLowerCase());
+    if (!room) continue;
+    const meta = captureTaskMetadata(spec);
+    await insertCaptureTask({
+      projectId: project.id,
+      entityId: room.id,
+      title: spec.title,
+      instruction: `${spec.instruction} [${meta.task_key}]`,
+      why: spec.why,
+      estimatedMinutes: spec.estimatedMinutes,
+      priority: spec.priority,
+      status: "open",
+    });
+    captureTaskCount++;
+  }
+
   const calibratePath = underlayEvidenceId
     ? `/projects/${project.id}/rooms/${living.id}?evidence=${underlayEvidenceId}`
     : `/projects/${project.id}/rooms/${living.id}`;
@@ -735,17 +770,19 @@ async function main() {
         cadWallsApply,
         cadRoomsApply,
         calibratePath,
+        capturePath: `/projects/${project.id}/capture`,
+        captureTaskCount,
         evidenceCount,
         documentCount,
         bytesCopied,
-        uploadsDir: `public/uploads/${project.id}/`,
+        uploadsDir: `.data/uploads/${project.id}/`,
         note: cadRoomsApply
-          ? "CAD walls split onto per-room entities. Open each room's geometry editor / walkthrough."
+          ? "CAD walls split onto per-room entities. Open each room's geometry editor / walkthrough. Shoot current photos via capturePath (IRL)."
           : cadWallsApply
-            ? "CAD walls upserted onto Living Room. Open calibratePath — geometry editor shows editable plan_wall entities."
+            ? "CAD walls upserted onto Living Room. Open calibratePath — geometry editor shows editable plan_wall entities. Shoot current photos via capturePath (IRL)."
             : cadUnderlayEvidenceId
-              ? "CAD underlay attached. Run npm run cad:apply-rooms (or APT54_APPLY_ROOMS=1) for per-room walls, or cad:apply-walls for Living outline."
-              : "Files are under public/uploads (gitignored). Open calibratePath to align Living Room walls to Plan 1 underlay.",
+              ? "CAD underlay attached. Run npm run cad:apply-rooms (or APT54_APPLY_ROOMS=1) for per-room walls, or cad:apply-walls for Living outline. Shoot current photos via capturePath (IRL)."
+              : "Files are under .data/uploads (gitignored, auth-gated). Open calibratePath to align Living Room walls to Plan 1 underlay. Shoot current photos via capturePath (IRL).",
       },
       null,
       2,

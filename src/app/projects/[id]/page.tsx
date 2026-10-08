@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProjectNav } from "@/components/shell";
+import { ShareLinksPanel } from "@/components/share-links-panel";
 import { buildEntityTree } from "@/lib/entity-tree";
 import {
   findCalibrationRoom,
@@ -15,15 +16,19 @@ import {
   listEntitiesByProject,
   listEvidenceForEntity,
 } from "@/lib/projects";
+import { listShareLinksForProject } from "@/lib/share-links";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ shareCreated?: string }>;
 }) {
   const { id } = await params;
+  const { shareCreated } = await searchParams;
   const project = await getProject(id);
   if (!project) notFound();
 
@@ -31,6 +36,7 @@ export default async function ProjectPage({
   const room = findCalibrationRoom(entityRows);
   const tasks = await listCaptureTasks(id);
   const tree = buildEntityTree(entityRows);
+  const shareLinks = await listShareLinksForProject(id);
 
   let calibrateHref: string | null = null;
   let calibrateLabel = room ? `Open ${room.name}` : null;
@@ -125,6 +131,12 @@ export default async function ProjectPage({
             {tree.length} root node(s) in hierarchy.
           </p>
         </div>
+
+        <ShareLinksPanel
+          projectId={id}
+          links={shareLinks}
+          justCreatedToken={shareCreated ?? null}
+        />
       </div>
     </div>
   );

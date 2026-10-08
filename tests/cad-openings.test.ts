@@ -6,7 +6,12 @@ import {
   proposeOpeningsFromCad,
   structuralOriginMeters,
 } from "@/lib/cad-openings";
-import type { CadWallsFile, ProposedWall } from "@/lib/cad-walls";
+import {
+  simplifyCadOriginMeters,
+  simplifyCadSegments,
+  type CadWallsFile,
+  type ProposedWall,
+} from "@/lib/cad-walls";
 
 function wall(
   x0: number,
@@ -182,5 +187,111 @@ describe("cad-openings", () => {
     ]);
     expect(result[0]!.openings.length).toBeGreaterThanOrEqual(1);
     expect(result[0]!.openings[0]!.category).toBe("window");
+  });
+
+  it("aligns opening coords with simplifyCadSegments origin (ignores short noise)", () => {
+    // Short structural fragment at (0,0) must not shift apartment origin —
+    // walls use minLength 0.2 filter; openings must match.
+    const file: CadWallsFile = {
+      unit_to_meters: 1,
+      segments: [
+        {
+          layer: "A-WL",
+          x1: 0,
+          y1: 0,
+          x2: 0.05,
+          y2: 0,
+          x1_m: 0,
+          y1_m: 0,
+          x2_m: 0.05,
+          y2_m: 0,
+        },
+        {
+          layer: "A-WL",
+          x1: 10,
+          y1: 20,
+          x2: 15,
+          y2: 20,
+          x1_m: 10,
+          y1_m: 20,
+          x2_m: 15,
+          y2_m: 20,
+        },
+        {
+          layer: "A-WIN",
+          x1: 12,
+          y1: 20,
+          x2: 13.2,
+          y2: 20,
+          x1_m: 12,
+          y1_m: 20,
+          x2_m: 13.2,
+          y2_m: 20,
+        },
+        {
+          layer: "A-WIN",
+          x1: 12,
+          y1: 20.08,
+          x2: 13.2,
+          y2: 20.08,
+          x1_m: 12,
+          y1_m: 20.08,
+          x2_m: 13.2,
+          y2_m: 20.08,
+        },
+        {
+          layer: "A-WIN",
+          x1: 12,
+          y1: 20,
+          x2: 12,
+          y2: 20.08,
+          x1_m: 12,
+          y1_m: 20,
+          x2_m: 12,
+          y2_m: 20.08,
+        },
+        {
+          layer: "A-WIN",
+          x1: 13.2,
+          y1: 20,
+          x2: 13.2,
+          y2: 20.08,
+          x1_m: 13.2,
+          y1_m: 20,
+          x2_m: 13.2,
+          y2_m: 20.08,
+        },
+      ],
+    };
+    const simplifyOpts = {
+      layers: ["A-WL"] as const,
+      minLength: 0.2,
+      grid: 0.05,
+    };
+    const wallOrigin = simplifyCadOriginMeters(
+      file.segments,
+      simplifyOpts,
+      1,
+    );
+    const openingOrigin = structuralOriginMeters(file, simplifyOpts);
+    expect(openingOrigin.minX).toBeCloseTo(wallOrigin.minX);
+    expect(openingOrigin.minY).toBeCloseTo(wallOrigin.minY);
+    expect(openingOrigin.minX).toBeCloseTo(10);
+    expect(openingOrigin.minY).toBeCloseTo(20);
+
+    const simplified = simplifyCadSegments(file.segments, simplifyOpts, 1);
+    expect(simplified.length).toBeGreaterThan(0);
+    expect(simplified.every((s) => s.x1 >= -0.01 && s.y1 >= -0.01)).toBe(true);
+
+    const walls = [wall(0, 0, 5, 0)];
+    const result = proposeOpeningsFromCad(
+      file,
+      [{ roomName: "Living Room", walls }],
+      { simplify: simplifyOpts },
+    );
+    expect(result[0]!.openings.length).toBeGreaterThanOrEqual(1);
+    // Window center ~2.1m along wall in apartment-local coords (12-10=2).
+    expect(result[0]!.openings[0]!.spatialAnchor.u).toBeGreaterThan(0.5);
+    expect(result[0]!.openings[0]!.spatialAnchor.u).toBeLessThan(3);
   });
 });

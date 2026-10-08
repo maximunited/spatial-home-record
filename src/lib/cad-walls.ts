@@ -276,6 +276,36 @@ function bboxOf(segments: MeterSegment[]): {
 }
 
 /**
+ * Apartment-local origin used by simplifyCadSegments: bbox min of structural
+ * segments after layer + minLength filtering (before grid snap / merge).
+ * Openings must use this same origin so they align with apartmentAnchor walls.
+ */
+export function simplifyCadOriginMeters(
+  segments: CadWallSegment[],
+  options: SimplifyCadOptions = {},
+  unitToMeters = 0.01,
+): { minX: number; minY: number; grid: number } {
+  const layers = new Set(options.layers ?? DEFAULT_STRUCTURAL_LAYERS);
+  const minLength = options.minLength ?? 0.25;
+  const grid = options.grid ?? 0.05;
+
+  const meters: MeterSegment[] = [];
+  for (const raw of segments) {
+    if (!layers.has(raw.layer)) continue;
+    const m = segmentToMeters(raw, unitToMeters);
+    if (segLength(m) < minLength) continue;
+    meters.push(m);
+  }
+  const box = bboxOf(meters);
+  return { minX: box.minX, minY: box.minY, grid };
+}
+
+/** Snap a meter coordinate onto the simplify grid (0 disables). */
+export function snapCadMeters(value: number, grid: number): number {
+  return snap(value, grid);
+}
+
+/**
  * Filter noise, snap to grid, translate to origin, merge colinear runs.
  */
 export function simplifyCadSegments(
@@ -285,7 +315,6 @@ export function simplifyCadSegments(
 ): MeterSegment[] {
   const layers = new Set(options.layers ?? DEFAULT_STRUCTURAL_LAYERS);
   const minLength = options.minLength ?? 0.25;
-  const grid = options.grid ?? 0.05;
   const mergeGap = options.mergeGap ?? 0.1;
   const angleTol = options.angleToleranceDeg ?? 2;
   const offsetTol = options.offsetTolerance ?? 0.08;
@@ -299,12 +328,16 @@ export function simplifyCadSegments(
   }
   if (meters.length === 0) return [];
 
-  const box = bboxOf(meters);
+  const { minX, minY, grid } = simplifyCadOriginMeters(
+    segments,
+    options,
+    unitToMeters,
+  );
   meters = meters.map((s) => ({
-    x1: snap(s.x1 - box.minX, grid),
-    y1: snap(s.y1 - box.minY, grid),
-    x2: snap(s.x2 - box.minX, grid),
-    y2: snap(s.y2 - box.minY, grid),
+    x1: snap(s.x1 - minX, grid),
+    y1: snap(s.y1 - minY, grid),
+    x2: snap(s.x2 - minX, grid),
+    y2: snap(s.y2 - minY, grid),
     layer: s.layer,
   }));
   meters = meters.filter((s) => segLength(s) >= minLength);

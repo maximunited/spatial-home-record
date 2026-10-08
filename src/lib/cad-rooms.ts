@@ -1153,6 +1153,12 @@ export function proposePerRoomWallsFromCad(
         minWidth: config.openings?.minWidth,
         maxWidth: config.openings?.maxWidth,
         maxWallDistance: config.openings?.maxWallDistance,
+        // Match simplifyCadSegments call above (minLength 0.2).
+        simplify: {
+          layers: defaultStructuralLayers(),
+          minLength: 0.2,
+          grid: 0.05,
+        },
       },
     );
     const map = new Map<string, ProposedOpening[]>(

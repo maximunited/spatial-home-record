@@ -11,9 +11,12 @@ import type { WallLocalAnchor } from "@/lib/anchors";
 import {
   defaultStructuralLayers,
   segmentToMeters,
+  simplifyCadOriginMeters,
+  snapCadMeters,
   type CadWallsFile,
   type MeterSegment,
   type ProposedWall,
+  type SimplifyCadOptions,
 } from "@/lib/cad-walls";
 
 export type OpeningCategory = "door" | "window";
@@ -60,6 +63,11 @@ export type ProposeOpeningsOptions = {
   defaultDoorHeight?: number;
   defaultWindowHeight?: number;
   defaultWindowSill?: number;
+  /**
+   * Structural simplify options for the apartment-local origin (must match
+   * proposePerRoomWallsFromCad / simplifyCadSegments). Default minLength 0.2.
+   */
+  simplify?: SimplifyCadOptions;
 };
 
 const PROVENANCE = "cad_openings";
@@ -83,45 +91,32 @@ function segLength(s: Pick<MeterSegment, "x1" | "y1" | "x2" | "y2">): number {
   return Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
 }
 
-function bboxOf(segments: MeterSegment[]): {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-} {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const s of segments) {
-    minX = Math.min(minX, s.x1, s.x2);
-    minY = Math.min(minY, s.y1, s.y2);
-    maxX = Math.max(maxX, s.x1, s.x2);
-    maxY = Math.max(maxY, s.y1, s.y2);
-  }
-  if (!Number.isFinite(minX)) {
-    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  }
-  return { minX, minY, maxX, maxY };
-}
+/** Default simplify options shared with proposePerRoomWallsFromCad. */
+const DEFAULT_OPENING_SIMPLIFY: SimplifyCadOptions = {
+  layers: defaultStructuralLayers(),
+  minLength: 0.2,
+  grid: 0.05,
+};
 
 /**
- * Origin used by simplifyCadSegments (structural bbox min before snap).
- * Openings must use the same origin to align with apartment-local walls.
+ * Origin used by simplifyCadSegments (structural bbox min after layer +
+ * minLength filter, before snap). Openings must use the same origin/grid
+ * to align with apartment-local walls.
  */
 export function structuralOriginMeters(
   file: CadWallsFile,
-  layers: readonly string[] = defaultStructuralLayers(),
-): { minX: number; minY: number } {
-  const layerSet = new Set(layers);
+  simplify: SimplifyCadOptions = DEFAULT_OPENING_SIMPLIFY,
+): { minX: number; minY: number; grid: number } {
   const unit = file.unit_to_meters ?? 0.01;
-  const meters: MeterSegment[] = [];
-  for (const raw of file.segments) {
-    if (!layerSet.has(raw.layer)) continue;
-    meters.push(segmentToMeters(raw, unit));
-  }
-  const box = bboxOf(meters);
-  return { minX: box.minX, minY: box.minY };
+  return simplifyCadOriginMeters(
+    file.segments,
+    {
+      layers: simplify.layers ?? DEFAULT_OPENING_SIMPLIFY.layers,
+      minLength: simplify.minLength ?? DEFAULT_OPENING_SIMPLIFY.minLength,
+      grid: simplify.grid ?? DEFAULT_OPENING_SIMPLIFY.grid,
+    },
+    unit,
+  );
 }
 
 function layerCategory(
@@ -147,14 +142,17 @@ export function extractOpeningSegments(
   options: {
     doorLayers?: readonly string[];
     windowLayers?: readonly string[];
-    origin?: { minX: number; minY: number };
+    origin?: { minX: number; minY: number; grid?: number };
+    simplify?: SimplifyCadOptions;
     minLength?: number;
   } = {},
 ): MeterSegment[] {
   const doorLayers = new Set(options.doorLayers ?? DEFAULT_DOOR_LAYERS);
   const windowLayers = new Set(options.windowLayers ?? DEFAULT_WINDOW_LAYERS);
   const unit = file.unit_to_meters ?? 0.01;
-  const origin = options.origin ?? structuralOriginMeters(file);
+  const origin =
+    options.origin ?? structuralOriginMeters(file, options.simplify);
+  const grid = origin.grid ?? options.simplify?.grid ?? DEFAULT_OPENING_SIMPLIFY.grid ?? 0.05;
   const minLength = options.minLength ?? 0.02;
   const out: MeterSegment[] = [];
 
@@ -162,10 +160,10 @@ export function extractOpeningSegments(
     if (!layerCategory(raw.layer, doorLayers, windowLayers)) continue;
     const m = segmentToMeters(raw, unit);
     const local: MeterSegment = {
-      x1: m.x1 - origin.minX,
-      y1: m.y1 - origin.minY,
-      x2: m.x2 - origin.minX,
-      y2: m.y2 - origin.minY,
+      x1: snapCadMeters(m.x1 - origin.minX, grid),
+      y1: snapCadMeters(m.y1 - origin.minY, grid),
+      x2: snapCadMeters(m.x2 - origin.minX, grid),
+      y2: snapCadMeters(m.y2 - origin.minY, grid),
       layer: raw.layer,
     };
     if (segLength(local) < minLength) continue;
@@ -413,6 +411,7 @@ export function proposeOpeningsFromCad(
   const segments = extractOpeningSegments(file, {
     doorLayers: options.doorLayers,
     windowLayers: options.windowLayers,
+    simplify: options.simplify ?? DEFAULT_OPENING_SIMPLIFY,
   });
   const candidates = clusterOpeningCandidates(segments, {
     doorLayers: options.doorLayers,

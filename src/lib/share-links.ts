@@ -222,10 +222,15 @@ export async function loadShareView(token: string) {
         id: l.id,
         type: l.type,
         summary: l.summary,
-        metadata: null,
-        storageKey: null,
+        metadata: l.metadata,
+        storageKey: l.storageKey,
         redactedStorageKey: null,
-        underlayStorageKey: null,
+        underlayStorageKey:
+          l.metadata &&
+          typeof l.metadata === "object" &&
+          (l.metadata as Record<string, unknown>).underlay === true
+            ? l.storageKey
+            : null,
         entityId: l.entityId,
       });
     }

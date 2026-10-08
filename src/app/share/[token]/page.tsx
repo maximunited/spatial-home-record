@@ -15,7 +15,7 @@ import {
   listEntitiesByProject,
   listEvidenceLinkedToEntities,
 } from "@/lib/projects";
-import { isShareSafeEvidence } from "@/lib/share-redaction";
+import { filterShareSafeWalkthroughEvidence } from "@/lib/share-redaction";
 
 export const dynamic = "force-dynamic";
 
@@ -101,13 +101,7 @@ export default async function ShareViewerPage({
         entityRows.map((e) => e.id),
       );
       // Strip non-share-safe evidence from hotspots (no receipt/payment docs).
-      const safeEvidence = evidenceLinks.filter((e) =>
-        isShareSafeEvidence({
-          type: e.type,
-          metadata: null,
-          storageKey: null,
-        }),
-      );
+      const safeEvidence = filterShareSafeWalkthroughEvidence(evidenceLinks);
       const scene = buildWalkthroughScene(
         room,
         entityRows,

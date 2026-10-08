@@ -427,10 +427,13 @@ export async function listEvidenceLinkedToEntities(
       id: evidence.id,
       type: evidence.type,
       summary: evidence.summary,
+      metadata: evidence.metadata,
+      storageKey: blobs.storageKey,
       entityId: evidenceLinks.entityId,
     })
     .from(evidence)
     .innerJoin(evidenceLinks, eq(evidenceLinks.evidenceId, evidence.id))
+    .leftJoin(blobs, eq(blobs.id, evidence.blobId))
     .where(
       and(
         eq(evidence.projectId, projectId),
@@ -441,6 +444,8 @@ export async function listEvidenceLinkedToEntities(
     id: r.id,
     type: r.type,
     summary: r.summary,
+    metadata: r.metadata,
+    storageKey: r.storageKey,
     entityId: r.entityId,
   }));
 }

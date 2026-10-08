@@ -136,6 +136,26 @@ export function isShareSafeEvidence(evidence: {
   return false;
 }
 
+/**
+ * Filter walkthrough hotspot evidence using full rows.
+ * Callers must pass real metadata + storageKey — nulls bypass receipt checks.
+ */
+export function filterShareSafeWalkthroughEvidence<
+  T extends {
+    type: string;
+    metadata?: Record<string, unknown> | null;
+    storageKey?: string | null;
+  },
+>(rows: readonly T[]): T[] {
+  return rows.filter((e) =>
+    isShareSafeEvidence({
+      type: e.type,
+      metadata: e.metadata ?? null,
+      storageKey: e.storageKey ?? null,
+    }),
+  );
+}
+
 /** Prefer redacted / underlay storage keys over original document blobs. */
 export function pickShareSafeAssetUrl(input: {
   storageKey?: string | null;

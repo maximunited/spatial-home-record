@@ -3,6 +3,7 @@ import {
   assertSharePayloadSafe,
   attributeAllowedForLayers,
   buildShareViewModel,
+  filterShareSafeWalkthroughEvidence,
   isPaymentAttributeKey,
   isPaymentDocumentType,
   isShareSafeEvidence,
@@ -96,6 +97,63 @@ describe("share-safe evidence", () => {
         storageKey: "uploads/p/wall.jpg",
       }),
     ).toBe(false);
+  });
+
+  it("requires real metadata/storageKey — nulls bypass receipt checks", () => {
+    // Bugbot regression: share walkthrough used to pass metadata:null +
+    // storageKey:null, which lets payment-tagged / document photos through.
+    expect(
+      isShareSafeEvidence({
+        type: "photo",
+        metadata: null,
+        storageKey: null,
+      }),
+    ).toBe(true);
+    expect(
+      isShareSafeEvidence({
+        type: "photo",
+        metadata: { contains_payment: true, document_id: "d1" },
+        storageKey: "uploads/p/documents/receipt.jpg",
+      }),
+    ).toBe(false);
+    expect(
+      isShareSafeEvidence({
+        type: "photo",
+        metadata: { document_type: "receipt", document_id: "d2" },
+        storageKey: "uploads/p/wall.jpg",
+      }),
+    ).toBe(false);
+  });
+
+  it("filters walkthrough evidence with real metadata and storage keys", () => {
+    const rows = [
+      {
+        id: "safe",
+        type: "photo",
+        metadata: { phase: "construction" },
+        storageKey: "uploads/p/wall.jpg",
+      },
+      {
+        id: "receipt",
+        type: "photo",
+        metadata: { contains_payment: true },
+        storageKey: "uploads/p/documents/receipt.jpg",
+      },
+      {
+        id: "invoice-key",
+        type: "photo",
+        metadata: { walkthrough: true },
+        storageKey: "seed/invoice.svg",
+      },
+      {
+        id: "doc-linked",
+        type: "photo",
+        metadata: { document_id: "doc-1" },
+        storageKey: "uploads/p/scan.jpg",
+      },
+    ];
+    const safe = filterShareSafeWalkthroughEvidence(rows);
+    expect(safe.map((r) => r.id)).toEqual(["safe"]);
   });
 
   it("prefers underlay / redacted asset URLs over originals", () => {

@@ -6,9 +6,13 @@ import { NextResponse } from "next/server";
 import {
   DATA_DIR,
   localBlobAbsolutePath,
+  projectIdFromUploadStorageKey,
   storageKeyFromApiPath,
 } from "@/lib/blobs";
-import { resolveUploadAuth } from "@/lib/upload-auth";
+import {
+  canAccessProjectBlob,
+  resolveUploadAuth,
+} from "@/lib/upload-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +62,26 @@ export async function GET(
       return NextResponse.json(
         { error: authResult.message },
         { status: authResult.status },
+      );
+    }
+
+    // Clerk users must own the project for uploads/{projectId}/… paths.
+    // Dev bypass (ALLOW_UNAUTHENTICATED_UPLOADS) stays explicit single-user local.
+    const projectId = projectIdFromUploadStorageKey(storageKey);
+    if (!projectId) {
+      return NextResponse.json({ error: "Invalid blob path" }, { status: 400 });
+    }
+    const { getProject } = await import("@/lib/projects");
+    const project = await getProject(projectId);
+    const scoped = canAccessProjectBlob({
+      auth: authResult,
+      projectFound: Boolean(project),
+      projectOwnerUserId: project?.ownerUserId ?? null,
+    });
+    if (!scoped.ok) {
+      return NextResponse.json(
+        { error: scoped.message },
+        { status: scoped.status },
       );
     }
   }

@@ -83,6 +83,39 @@ export async function assertCanAccessPrivateBlobs(): Promise<UploadAuthResult & 
   return result;
 }
 
+export type BlobProjectAccessInput = {
+  auth: UploadAuthResult & { ok: true };
+  /** Project owner from `projects.owner_user_id` (null = unowned / legacy). */
+  projectOwnerUserId: string | null | undefined;
+  /** When false, projectId from the storage key was missing or not found. */
+  projectFound: boolean;
+};
+
+/**
+ * Pure gate: after upload auth succeeds, Clerk users may only read blobs for
+ * projects they own. Dev bypass (ALLOW_UNAUTHENTICATED_UPLOADS) is single-user
+ * local only — it may read any project blob without an owner check.
+ */
+export function canAccessProjectBlob(input: BlobProjectAccessInput): {
+  ok: true;
+} | { ok: false; status: 403 | 404; message: string } {
+  if (!input.projectFound) {
+    return { ok: false, status: 404, message: "Not found" };
+  }
+  if (input.auth.mode === "dev_bypass") {
+    return { ok: true };
+  }
+  const owner = input.projectOwnerUserId ?? null;
+  if (!owner || owner !== input.auth.userId) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Not authorized for this project blob",
+    };
+  }
+  return { ok: true };
+}
+
 export class UploadAuthError extends Error {
   readonly status: 401 | 403;
 

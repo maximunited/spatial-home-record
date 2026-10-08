@@ -73,6 +73,22 @@ export function storageKeyFromApiPath(segments: string[]): string {
   return cleaned;
 }
 
+/**
+ * Extract projectId from `uploads/{projectId}/…` storage keys.
+ * Returns null when the key is not a private upload path with a project segment.
+ */
+export function projectIdFromUploadStorageKey(
+  storageKey: string,
+): string | null {
+  const cleaned = cleanStorageKey(storageKey);
+  if (!cleaned.startsWith("uploads/")) return null;
+  const rest = cleaned.slice("uploads/".length);
+  const slash = rest.indexOf("/");
+  if (slash <= 0) return null;
+  const projectId = rest.slice(0, slash).trim();
+  return projectId || null;
+}
+
 export function sanitizeUploadFilename(name: string): string {
   const base = path.basename(name).replace(/[^\w.\-]+/g, "_");
   return base.slice(0, 180) || "upload.bin";

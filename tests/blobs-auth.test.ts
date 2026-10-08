@@ -5,11 +5,13 @@ import {
   isPrivateUploadKey,
   isPublicSeedKey,
   localBlobAbsolutePath,
+  projectIdFromUploadStorageKey,
   sanitizeUploadFilename,
   storageKeyFromApiPath,
 } from "@/lib/blobs";
 import {
   allowUnauthenticatedUploads,
+  canAccessProjectBlob,
   isClerkConfigured,
   isProductionLike,
   resolveUploadAuth,
@@ -56,6 +58,84 @@ describe("blobs helpers", () => {
     expect(sanitizeUploadFilename("My Receipt (1).PDF")).toBe(
       "My_Receipt_1_.PDF",
     );
+  });
+
+  it("extracts projectId from uploads/{projectId}/… keys", () => {
+    expect(projectIdFromUploadStorageKey("uploads/proj-a/file.jpg")).toBe(
+      "proj-a",
+    );
+    expect(projectIdFromUploadStorageKey("/uploads/abc/x/y.pdf")).toBe("abc");
+    expect(projectIdFromUploadStorageKey("seed/a.svg")).toBeNull();
+    expect(projectIdFromUploadStorageKey("uploads/")).toBeNull();
+    expect(projectIdFromUploadStorageKey("uploads/only-id")).toBeNull();
+  });
+});
+
+describe("blob project scoping", () => {
+  it("allows Clerk owner and denies other signed-in users", () => {
+    const ownerAuth = {
+      ok: true as const,
+      mode: "clerk" as const,
+      userId: "user_owner",
+    };
+    expect(
+      canAccessProjectBlob({
+        auth: ownerAuth,
+        projectFound: true,
+        projectOwnerUserId: "user_owner",
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      canAccessProjectBlob({
+        auth: { ...ownerAuth, userId: "user_other" },
+        projectFound: true,
+        projectOwnerUserId: "user_owner",
+      }),
+    ).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it("denies Clerk access when project is missing or has no owner", () => {
+    const auth = {
+      ok: true as const,
+      mode: "clerk" as const,
+      userId: "user_a",
+    };
+    expect(
+      canAccessProjectBlob({
+        auth,
+        projectFound: false,
+        projectOwnerUserId: null,
+      }),
+    ).toMatchObject({ ok: false, status: 404 });
+    expect(
+      canAccessProjectBlob({
+        auth,
+        projectFound: true,
+        projectOwnerUserId: null,
+      }),
+    ).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it("dev bypass may read any found project blob (single-user local)", () => {
+    const bypass = {
+      ok: true as const,
+      mode: "dev_bypass" as const,
+      userId: null,
+    };
+    expect(
+      canAccessProjectBlob({
+        auth: bypass,
+        projectFound: true,
+        projectOwnerUserId: "someone-else",
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      canAccessProjectBlob({
+        auth: bypass,
+        projectFound: false,
+        projectOwnerUserId: null,
+      }),
+    ).toMatchObject({ ok: false, status: 404 });
   });
 });
 

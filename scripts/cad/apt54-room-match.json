@@ -1,21 +1,34 @@
 {
-  "version": 1,
-  "notes": "Apartment 54 / Neve Yehushua — room match hints for cad:apply-rooms. Coordinates are apartment-local meters after CAD normalize (origin at structural bbox min). Optional overrides: set seed {x,y} and/or bbox {minX,minY,maxX,maxY} per room name.",
+  "version": 2,
+  "notes": "Apartment 54 / Neve Yehushua — room match + openings for cad:apply-rooms. Coordinates are apartment-local meters after CAD normalize (origin at structural bbox min). Optional overrides: set seed {x,y} and/or bbox {minX,minY,maxX,maxY} per room name (overrides always win). Hallway/Balcony names are optional — if those room entities do not exist, corridor/balcony regions are skipped so they do not steal bedroom/wet slots.",
   "partition": {
     "cellSize": 0.15,
     "wallThickness": 0.12,
     "collapseDoubleLines": true,
-    "targetSeedCount": 12,
-    "minRegionArea": 2.0,
+    "targetSeedCount": 14,
+    "minRegionArea": 2.5,
     "minSeedClearance": 0.4,
-    "minSeedSeparation": 1.8
+    "minSeedSeparation": 1.6
   },
   "match": {
     "livingName": "Living Room",
     "kitchenName": "Kitchen",
     "bathroomName": "Bathroom",
     "closetName": "Walk-in Closet",
-    "bedroomNames": ["Master Bedroom", "Bedroom 2", "Bedroom 3"]
+    "hallwayName": "Hallway",
+    "balconyName": "Balcony",
+    "bedroomNames": ["Master Bedroom", "Bedroom 2", "Bedroom 3"],
+    "skipCorridorClasses": true
+  },
+  "openings": {
+    "enabled": true,
+    "minWidth": 0.55,
+    "maxWidth": 3.2,
+    "maxWallDistance": 0.55
+  },
+  "sharedWalls": {
+    "maxSeparation": 0.18,
+    "minOverlap": 0.5
   },
   "overrides": []
 }

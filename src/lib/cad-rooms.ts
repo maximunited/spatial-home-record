@@ -4,11 +4,17 @@
  * Pipeline:
  * 1. Simplify structural segments (optional double-line → centerline collapse)
  * 2. Partition open space via distance-to-wall seeds + multi-source BFS
- * 3. Match regions to named rooms (heuristics + optional config overrides)
- * 4. Assign nearby segments to each room in room-local meters
+ * 3. Match regions to named rooms (hallway/balcony aware + overrides)
+ * 4. Assign nearby segments in room-local meters; dedupe within room
+ * 5. Annotate shared partitions (duplicate OK — per-room entities)
+ * 6. Detect A-DOR / A-WIN* openings onto those walls (wall-local + confidence)
  */
 
 import type { ConfidenceState } from "@/lib/confidence";
+import {
+  proposeOpeningsFromCad,
+  type ProposedOpening,
+} from "@/lib/cad-openings";
 import {
   defaultStructuralLayers,
   segmentToMeters,
@@ -44,6 +50,8 @@ export type RoomMatchOverride = {
   seed?: { x: number; y: number };
 };
 
+export type RegionClass = "room" | "hallway" | "balcony";
+
 export type CadRoomMatchConfig = {
   version?: number;
   notes?: string;
@@ -62,6 +70,25 @@ export type CadRoomMatchConfig = {
     bathroomName?: string;
     closetName?: string;
     bedroomNames?: string[];
+    hallwayName?: string;
+    balconyName?: string;
+    /**
+     * When true (default), hallway/balcony-classified regions are not used
+     * for closet/bath/bedroom/leftover assignment unless those names match.
+     */
+    skipCorridorClasses?: boolean;
+  };
+  openings?: {
+    enabled?: boolean;
+    minWidth?: number;
+    maxWidth?: number;
+    maxWallDistance?: number;
+  };
+  sharedWalls?: {
+    /** Max separation (m) to treat two apartment segments as the same partition. */
+    maxSeparation?: number;
+    /** Min overlap (m) along the shared line. */
+    minOverlap?: number;
   };
   overrides?: RoomMatchOverride[];
 };
@@ -70,7 +97,9 @@ export type MatchedRoomGeometry = {
   roomName: string;
   region: DetectedRoomRegion;
   matchReason: string;
+  regionClass: RegionClass;
   geometry: ProposedRoomGeometry;
+  openings: ProposedOpening[];
 };
 
 export type ProposePerRoomOptions = {
@@ -113,7 +142,7 @@ function bboxOf(segments: MeterSegment[]): RoomBBox {
 }
 
 function lineAngleDeg(s: MeterSegment): number {
-  let ang = (Math.atan2(s.y2 - s.y1, s.x2 - s.x1) * 180) / Math.PI;
+  const ang = (Math.atan2(s.y2 - s.y1, s.x2 - s.x1) * 180) / Math.PI;
   return ((ang % 180) + 180) % 180;
 }
 
@@ -459,23 +488,92 @@ function findName(names: string[], needle: string): string | undefined {
 }
 
 /**
+ * Classify a region as hallway / balcony / ordinary room.
+ * Hallway: elongated mid-size corridor. Balcony: modest area hugging the
+ * apartment exterior AABB.
+ */
+export function classifyRegion(
+  region: DetectedRoomRegion,
+  apartmentBBox: RoomBBox,
+  options: {
+    hallwayMinAspect?: number;
+    hallwayMaxArea?: number;
+    balconyMaxArea?: number;
+    exteriorMargin?: number;
+  } = {},
+): RegionClass {
+  const w = Math.max(region.maxX - region.minX, 0.01);
+  const h = Math.max(region.maxY - region.minY, 0.01);
+  const aspect = Math.max(w, h) / Math.min(w, h);
+  const hallwayMinAspect = options.hallwayMinAspect ?? 2.3;
+  const hallwayMaxArea = options.hallwayMaxArea ?? 16;
+  const balconyMaxArea = options.balconyMaxArea ?? 12;
+  const exteriorMargin = options.exteriorMargin ?? 0.55;
+
+  if (
+    aspect >= hallwayMinAspect &&
+    region.area >= 3 &&
+    region.area <= hallwayMaxArea
+  ) {
+    return "hallway";
+  }
+
+  if (
+    region.minX <= apartmentBBox.minX + exteriorMargin ||
+    region.maxX >= apartmentBBox.maxX - exteriorMargin ||
+    region.minY <= apartmentBBox.minY + exteriorMargin ||
+    region.maxY >= apartmentBBox.maxY - exteriorMargin
+  ) {
+    if (
+      region.area <= balconyMaxArea &&
+      region.area >= 2 &&
+      aspect < 2.8
+    ) {
+      const alongX =
+        Math.min(region.maxX, apartmentBBox.maxX) -
+        Math.max(region.minX, apartmentBBox.minX);
+      const alongY =
+        Math.min(region.maxY, apartmentBBox.maxY) -
+        Math.max(region.minY, apartmentBBox.minY);
+      const onMinX = region.minX <= apartmentBBox.minX + exteriorMargin;
+      const onMaxX = region.maxX >= apartmentBBox.maxX - exteriorMargin;
+      const onMinY = region.minY <= apartmentBBox.minY + exteriorMargin;
+      const onMaxY = region.maxY >= apartmentBBox.maxY - exteriorMargin;
+      const exteriorLen =
+        (onMinX || onMaxX ? Math.max(alongY, 0) : 0) +
+        (onMinY || onMaxY ? Math.max(alongX, 0) : 0);
+      if (exteriorLen >= 1.2) return "balcony";
+    }
+  }
+
+  return "room";
+}
+
+/**
  * Match detected regions to project room names.
  *
  * Default rules (override via config.overrides / config.match names):
- * 1. Largest region → Living Room
- * 2. Among remaining, region with longest shared boundary with Living → Kitchen
- *    (fallback: second-largest)
- * 3. Smallest → Walk-in Closet
- * 4. Next-smallest → Bathroom
- * 5. Remaining by area desc → Master Bedroom, Bedroom 2, Bedroom 3, …
- * 6. Explicit bbox overrides always win for that name
+ * 1. Explicit bbox overrides always win for that name
+ * 2. Largest ordinary region → Living Room
+ * 3. Longest shared boundary with Living → Kitchen (else second-largest)
+ * 4. Hallway / balcony names (if present) claim classified regions
+ * 5. Smallest ordinary → Walk-in Closet; next-smallest → Bathroom
+ * 6. Remaining ordinary by area desc → bedrooms
+ * 7. Leftover room names get leftover regions (corridors skipped by default)
  */
 export function matchRegionsToRooms(
   regions: DetectedRoomRegion[],
   roomNames: string[],
   config: CadRoomMatchConfig = {},
-): Array<{ roomName: string; region: DetectedRoomRegion; reason: string }> {
+  apartmentBBox?: RoomBBox,
+): Array<{
+  roomName: string;
+  region: DetectedRoomRegion;
+  reason: string;
+  regionClass: RegionClass;
+}> {
   const match = config.match ?? {};
+  const skipCorridors = match.skipCorridorClasses !== false;
   const livingName =
     findName(roomNames, match.livingName ?? "Living") ??
     findName(roomNames, "living");
@@ -488,6 +586,14 @@ export function matchRegionsToRooms(
   const closetName =
     findName(roomNames, match.closetName ?? "Walk-in Closet") ??
     findName(roomNames, "closet");
+  const hallwayName =
+    findName(roomNames, match.hallwayName ?? "Hallway") ??
+    findName(roomNames, "hall") ??
+    findName(roomNames, "corridor");
+  const balconyName =
+    findName(roomNames, match.balconyName ?? "Balcony") ??
+    findName(roomNames, "balcony") ??
+    findName(roomNames, "terrace");
   const bedroomNames = (match.bedroomNames ?? []).length
     ? (match.bedroomNames ?? [])
         .map((n) => findName(roomNames, n))
@@ -495,26 +601,54 @@ export function matchRegionsToRooms(
     : roomNames
         .filter((n) => /bedroom|master/i.test(n))
         .sort((a, b) => {
-          // Master first, then numeric order
           const am = /master/i.test(a) ? 0 : 1;
           const bm = /master/i.test(b) ? 0 : 1;
           if (am !== bm) return am - bm;
           return a.localeCompare(b, undefined, { numeric: true });
         });
 
+  const aptBox =
+    apartmentBBox ??
+    (regions.length
+      ? {
+          minX: Math.min(...regions.map((r) => r.minX)),
+          minY: Math.min(...regions.map((r) => r.minY)),
+          maxX: Math.max(...regions.map((r) => r.maxX)),
+          maxY: Math.max(...regions.map((r) => r.maxY)),
+        }
+      : { minX: 0, minY: 0, maxX: 0, maxY: 0 });
+
+  const classOf = new Map<number, RegionClass>();
+  for (const r of regions) {
+    classOf.set(r.id, classifyRegion(r, aptBox));
+  }
+
   const usedRegions = new Set<number>();
   const usedNames = new Set<string>();
-  const out: Array<{ roomName: string; region: DetectedRoomRegion; reason: string }> =
-    [];
+  const out: Array<{
+    roomName: string;
+    region: DetectedRoomRegion;
+    reason: string;
+    regionClass: RegionClass;
+  }> = [];
 
-  const take = (roomName: string, region: DetectedRoomRegion, reason: string) => {
+  const take = (
+    roomName: string,
+    region: DetectedRoomRegion,
+    reason: string,
+    regionClass?: RegionClass,
+  ) => {
     if (usedNames.has(roomName) || usedRegions.has(region.id)) return;
     usedNames.add(roomName);
     usedRegions.add(region.id);
-    out.push({ roomName, region, reason });
+    out.push({
+      roomName,
+      region,
+      reason,
+      regionClass: regionClass ?? classOf.get(region.id) ?? "room",
+    });
   };
 
-  // Bbox overrides first
   for (const o of config.overrides ?? []) {
     const name = findName(roomNames, o.name);
     if (!name || !o.bbox) continue;
@@ -530,19 +664,28 @@ export function matchRegionsToRooms(
       cy: (b.minY + b.maxY) / 2,
       seedClearance: 0,
     };
-    take(name, region, "config bbox override");
+    classOf.set(region.id, "room");
+    take(name, region, "config bbox override", "room");
   }
 
-  const available = () => regions.filter((r) => !usedRegions.has(r.id));
+  const available = (opts?: { classes?: RegionClass[] }) =>
+    regions.filter((r) => {
+      if (usedRegions.has(r.id)) return false;
+      if (!opts?.classes) return true;
+      return opts.classes.includes(classOf.get(r.id) ?? "room");
+    });
+
+  const ordinary = () =>
+    skipCorridors ? available({ classes: ["room"] }) : available();
 
   if (livingName) {
-    const living = available()[0];
+    const living = ordinary()[0] ?? available()[0];
     if (living) take(livingName, living, "largest region → living");
   }
 
   if (kitchenName) {
     const living = out.find((m) => m.roomName === livingName)?.region;
-    const rest = available();
+    const rest = ordinary();
     let kitchen = rest[0];
     let reason = "second-largest → kitchen fallback";
     if (living && rest.length) {
@@ -559,23 +702,40 @@ export function matchRegionsToRooms(
         const adjacent = rest.find((r) => r.id === best);
         if (adjacent) {
           kitchen = adjacent;
-          reason = `adjacent to living (shared ~${bestScore.toFixed(1)}m) → kitchen`;
+          reason =
+            "adjacent to living (shared ~" +
+            bestScore.toFixed(1) +
+            "m) → kitchen";
         }
       }
     }
     if (kitchen) take(kitchenName, kitchen, reason);
   }
 
-  const wetPool = available().slice().sort((a, b) => a.area - b.area);
+  if (hallwayName) {
+    const halls = available({ classes: ["hallway"] }).sort(
+      (a, b) => b.area - a.area,
+    );
+    if (halls[0]) take(hallwayName, halls[0], "elongated corridor → hallway");
+  }
+
+  if (balconyName) {
+    const bals = available({ classes: ["balcony"] }).sort(
+      (a, b) => b.area - a.area,
+    );
+    if (bals[0]) take(balconyName, bals[0], "exterior edge region → balcony");
+  }
+
+  const wetPool = ordinary().slice().sort((a, b) => a.area - b.area);
   if (closetName && wetPool[0]) {
     take(closetName, wetPool[0], "smallest region → closet");
   }
-  const wetPool2 = available().slice().sort((a, b) => a.area - b.area);
+  const wetPool2 = ordinary().slice().sort((a, b) => a.area - b.area);
   if (bathroomName && wetPool2[0]) {
     take(bathroomName, wetPool2[0], "next-smallest → bathroom");
   }
 
-  const bedroomsLeft = available().sort((a, b) => b.area - a.area);
+  const bedroomsLeft = ordinary().sort((a, b) => b.area - a.area);
   for (let i = 0; i < bedroomNames.length; i++) {
     const name = bedroomNames[i]!;
     const region = bedroomsLeft[i];
@@ -583,17 +743,31 @@ export function matchRegionsToRooms(
     take(
       name,
       region,
-      i === 0 ? "largest remaining → master/first bedroom" : `area rank → ${name}`,
+      i === 0
+        ? "largest remaining → master/first bedroom"
+        : "area rank → " + name,
     );
   }
 
-  // Any still-unmatched room names: assign leftover regions by area
-  const leftovers = available().sort((a, b) => b.area - a.area);
+  const leftovers = [
+    ...ordinary().sort((a, b) => b.area - a.area),
+    ...available()
+      .filter((r) => (classOf.get(r.id) ?? "room") !== "room")
+      .sort((a, b) => b.area - a.area),
+  ];
   const unmatched = roomNames.filter((n) => !usedNames.has(n));
   for (let i = 0; i < unmatched.length; i++) {
     const region = leftovers[i];
     if (!region) break;
-    take(unmatched[i]!, region, "leftover region by area");
+    const cls = classOf.get(region.id) ?? "room";
+    take(
+      unmatched[i]!,
+      region,
+      cls === "room"
+        ? "leftover region by area"
+        : "leftover " + cls + " region by area",
+      cls,
+    );
   }
 
   return out;
@@ -608,14 +782,15 @@ function wallName(index: number, start: PlanPoint, end: PlanPoint): string {
 }
 
 function toProposedWall(
-  s: MeterSegment,
+  local: MeterSegment,
+  apartment: MeterSegment,
   index: number,
   exterior: boolean,
   height: number,
   thickness: number,
 ): ProposedWall {
-  const start = { x: round3(s.x1), y: round3(s.y1) };
-  const end = { x: round3(s.x2), y: round3(s.y2) };
+  const start = { x: round3(local.x1), y: round3(local.y1) };
+  const end = { x: round3(local.x2), y: round3(local.y2) };
   return {
     name: wallName(index, start, end),
     category: exterior ? "exterior" : "interior",
@@ -626,10 +801,16 @@ function toProposedWall(
       x1: end.x,
       y1: end.y,
     },
+    apartmentAnchor: {
+      x0: round3(apartment.x1),
+      y0: round3(apartment.y1),
+      x1: round3(apartment.x2),
+      y1: round3(apartment.y2),
+    },
     length: round3(wallLength(start, end)),
     height,
     thickness,
-    layer: s.layer,
+    layer: local.layer,
     confidence: "supported",
     provenance: PROVENANCE,
   };
@@ -657,6 +838,116 @@ function nearBBoxEdge(s: MeterSegment, box: RoomBBox, margin: number): boolean {
   );
 }
 
+/**
+ * Deduplicate near-identical walls inside one room (colinear + overlapping).
+ */
+export function dedupeRoomWalls(
+  walls: ProposedWall[],
+  options: { angleTolDeg?: number; maxSeparation?: number; minOverlap?: number } = {},
+): ProposedWall[] {
+  const angleTol = options.angleTolDeg ?? 6;
+  const maxSep = options.maxSeparation ?? 0.12;
+  const minOverlap = options.minOverlap ?? 0.35;
+  const kept: ProposedWall[] = [];
+
+  for (const wall of [...walls].sort((a, b) => b.length - a.length)) {
+    const a = wall.spatialAnchor;
+    let duplicate = false;
+    for (const other of kept) {
+      const b = other.spatialAnchor;
+      const angA = (Math.atan2(a.y1 - a.y0, a.x1 - a.x0) * 180) / Math.PI;
+      const angB = (Math.atan2(b.y1 - b.y0, b.x1 - b.x0) * 180) / Math.PI;
+      let dAng = Math.abs((((angA - angB) % 180) + 180) % 180);
+      dAng = Math.min(dAng, 180 - dAng);
+      if (dAng > angleTol) continue;
+      const dx = a.x1 - a.x0;
+      const dy = a.y1 - a.y0;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const nx = -uy;
+      const ny = ux;
+      const lat = (b.x0 - a.x0) * nx + (b.y0 - a.y0) * ny;
+      if (Math.abs(lat) > maxSep) continue;
+      const t0 = (b.x0 - a.x0) * ux + (b.y0 - a.y0) * uy;
+      const t1 = (b.x1 - a.x0) * ux + (b.y1 - a.y0) * uy;
+      const lo = Math.min(t0, t1);
+      const hi = Math.max(t0, t1);
+      const overlap = Math.min(len, hi) - Math.max(0, lo);
+      if (overlap >= minOverlap) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate) kept.push(wall);
+  }
+
+  return kept.map((w, i) => ({
+    ...w,
+    name: wallName(
+      i,
+      { x: w.spatialAnchor.x0, y: w.spatialAnchor.y0 },
+      { x: w.spatialAnchor.x1, y: w.spatialAnchor.y1 },
+    ),
+  }));
+}
+
+/**
+ * Annotate cross-room shared partitions. Model: **duplicate OK** — each room
+ * keeps its own wall entity in room-local coords; sharedKey links the pair.
+ * Never collapses to a single shared entity (openings/editor are per-room).
+ */
+export function annotateSharedWalls(
+  matched: MatchedRoomGeometry[],
+  options: { maxSeparation?: number; minOverlap?: number; angleTolDeg?: number } = {},
+): MatchedRoomGeometry[] {
+  const maxSep = options.maxSeparation ?? 0.18;
+  const minOverlap = options.minOverlap ?? 0.5;
+  const angleTol = options.angleTolDeg ?? 6;
+  let nextKey = 1;
+
+  for (let i = 0; i < matched.length; i++) {
+    const aWalls = matched[i]!.geometry.walls;
+    for (let j = i + 1; j < matched.length; j++) {
+      const bWalls = matched[j]!.geometry.walls;
+      for (const aw of aWalls) {
+        const aa = aw.apartmentAnchor;
+        if (!aa) continue;
+        for (const bw of bWalls) {
+          const ba = bw.apartmentAnchor;
+          if (!ba) continue;
+          const angA = (Math.atan2(aa.y1 - aa.y0, aa.x1 - aa.x0) * 180) / Math.PI;
+          const angB = (Math.atan2(ba.y1 - ba.y0, ba.x1 - ba.x0) * 180) / Math.PI;
+          let dAng = Math.abs((((angA - angB) % 180) + 180) % 180);
+          dAng = Math.min(dAng, 180 - dAng);
+          if (dAng > angleTol) continue;
+          const dx = aa.x1 - aa.x0;
+          const dy = aa.y1 - aa.y0;
+          const len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len;
+          const uy = dy / len;
+          const nx = -uy;
+          const ny = ux;
+          const lat = (ba.x0 - aa.x0) * nx + (ba.y0 - aa.y0) * ny;
+          if (Math.abs(lat) > maxSep) continue;
+          const t0 = (ba.x0 - aa.x0) * ux + (ba.y0 - aa.y0) * uy;
+          const t1 = (ba.x1 - aa.x0) * ux + (ba.y1 - aa.y0) * uy;
+          const lo = Math.min(t0, t1);
+          const hi = Math.max(t0, t1);
+          const overlap = Math.min(len, hi) - Math.max(0, lo);
+          if (overlap < minOverlap) continue;
+          const key = aw.sharedKey ?? bw.sharedKey ?? `shared-${nextKey++}`;
+          aw.sharedKey = key;
+          bw.sharedKey = key;
+          aw.category = "interior";
+          bw.category = "interior";
+        }
+      }
+    }
+  }
+  return matched;
+}
+
 export function proposeWallsForRegion(
   segments: MeterSegment[],
   region: DetectedRoomRegion,
@@ -665,40 +956,67 @@ export function proposeWallsForRegion(
     wallThickness?: number;
     proposeMinLength?: number;
     assignPad?: number;
+    /** Other matched regions — segments closer to those centers are skipped. */
+    otherRegions?: DetectedRoomRegion[];
   } = {},
 ): ProposedRoomGeometry {
   const ceilingHeight = options.ceilingHeight ?? 2.7;
   const thickness = options.wallThickness ?? 0.15;
   const proposeMin = options.proposeMinLength ?? 0.35;
   const pad = options.assignPad ?? 0.35;
+  const others = options.otherRegions ?? [];
 
-  const assigned = segments.filter(
-    (s) =>
-      segLength(s) >= proposeMin && segmentMidInside(s, region, pad),
-  );
-
-  // Prefer envelope walls near the region bbox; keep only long true interiors.
   const edgeMargin = Math.min(
     0.9,
     Math.max(0.45, 0.2 * Math.min(region.maxX - region.minX, region.maxY - region.minY)),
   );
+
+  const assigned = segments.filter((s) => {
+    if (segLength(s) < proposeMin) return false;
+    if (!segmentMidInside(s, region, pad)) return false;
+    const mx = (s.x1 + s.x2) / 2;
+    const my = (s.y1 + s.y2) / 2;
+    for (const o of others) {
+      const corePad = -Math.min(
+        0.5,
+        0.15 * Math.min(o.maxX - o.minX, o.maxY - o.minY),
+      );
+      if (
+        segmentMidInside(s, o, corePad) &&
+        !nearBBoxEdge(s, region, edgeMargin + 0.15)
+      ) {
+        return false;
+      }
+      const dSelf = Math.hypot(mx - region.cx, my - region.cy);
+      const dOther = Math.hypot(mx - o.cx, my - o.cy);
+      if (dOther + 0.4 < dSelf && !nearBBoxEdge(s, region, edgeMargin)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   const chosen = assigned
     .filter(
       (s) =>
         nearBBoxEdge(s, region, edgeMargin) ||
         (segLength(s) >= 2.0 &&
-          segmentMidInside(s, {
-            minX: region.minX + edgeMargin,
-            minY: region.minY + edgeMargin,
-            maxX: region.maxX - edgeMargin,
-            maxY: region.maxY - edgeMargin,
-          }, 0)),
+          segmentMidInside(
+            s,
+            {
+              minX: region.minX + edgeMargin,
+              minY: region.minY + edgeMargin,
+              maxX: region.maxX - edgeMargin,
+              maxY: region.maxY - edgeMargin,
+            },
+            0,
+          )),
     )
     .sort((a, b) => segLength(b) - segLength(a));
 
   const planWidth = round3(Math.max(region.maxX - region.minX, 0));
   const planDepth = round3(Math.max(region.maxY - region.minY, 0));
-  const walls = chosen.map((s, i) => {
+  let walls = chosen.map((s, i) => {
     const local: MeterSegment = {
       x1: s.x1 - region.minX,
       y1: s.y1 - region.minY,
@@ -708,12 +1026,14 @@ export function proposeWallsForRegion(
     };
     return toProposedWall(
       local,
+      s,
       i,
       nearBBoxEdge(s, region, 0.85),
       ceilingHeight,
       thickness,
     );
   });
+  walls = dedupeRoomWalls(walls);
 
   const confidence: ConfidenceState = walls.length >= 3 ? "supported" : "estimated";
 
@@ -740,6 +1060,7 @@ export function isCadRoomMatchConfig(value: unknown): value is CadRoomMatchConfi
 
 /**
  * Full per-room proposal from a walls.json payload + room name list.
+ * Includes openings (A-DOR / A-WIN*) and shared-wall annotation.
  */
 export function proposePerRoomWallsFromCad(
   file: CadWallsFile,
@@ -768,7 +1089,6 @@ export function proposePerRoomWallsFromCad(
     .filter((o) => o.seed)
     .map((o) => o.seed!);
 
-  // Bbox-only overrides still participate as forced seeds at their centers
   for (const o of config.overrides ?? []) {
     if (o.bbox && !o.seed) {
       forcedSeeds.push({
@@ -788,18 +1108,61 @@ export function proposePerRoomWallsFromCad(
     forcedSeeds,
   });
 
-  const matches = matchRegionsToRooms(regions, options.roomNames, config);
-  const matched: MatchedRoomGeometry[] = matches.map((m) => ({
-    roomName: m.roomName,
-    region: m.region,
-    matchReason: m.reason,
-    geometry: proposeWallsForRegion(segments, m.region, {
-      ceilingHeight: options.ceilingHeight,
-      wallThickness: options.wallThickness,
-      proposeMinLength: options.proposeMinLength,
-      assignPad: options.assignPad,
-    }),
-  }));
+  const aptBox = bboxOf(segments);
+  const matches = matchRegionsToRooms(
+    regions,
+    options.roomNames,
+    config,
+    aptBox,
+  );
+
+  let matched: MatchedRoomGeometry[] = matches.map((m) => {
+    const otherRegions = matches
+      .filter((x) => x.region.id !== m.region.id)
+      .map((x) => x.region);
+    return {
+      roomName: m.roomName,
+      region: m.region,
+      matchReason: m.reason,
+      regionClass: m.regionClass,
+      geometry: proposeWallsForRegion(segments, m.region, {
+        ceilingHeight: options.ceilingHeight,
+        wallThickness: options.wallThickness,
+        proposeMinLength: options.proposeMinLength,
+        assignPad: options.assignPad,
+        otherRegions,
+      }),
+      openings: [],
+    };
+  });
+
+  matched = annotateSharedWalls(matched, {
+    maxSeparation: config.sharedWalls?.maxSeparation,
+    minOverlap: config.sharedWalls?.minOverlap,
+  });
+
+  const openingsEnabled = config.openings?.enabled !== false;
+  if (openingsEnabled) {
+    const byRoom = proposeOpeningsFromCad(
+      file,
+      matched.map((m) => ({
+        roomName: m.roomName,
+        walls: m.geometry.walls,
+      })),
+      {
+        minWidth: config.openings?.minWidth,
+        maxWidth: config.openings?.maxWidth,
+        maxWallDistance: config.openings?.maxWallDistance,
+      },
+    );
+    const map = new Map<string, ProposedOpening[]>(
+      byRoom.map((r) => [r.roomName, r.openings]),
+    );
+    matched = matched.map((m) => ({
+      ...m,
+      openings: map.get(m.roomName) ?? ([] as ProposedOpening[]),
+    }));
+  }
 
   return {
     apartmentLocalSegments: segments,

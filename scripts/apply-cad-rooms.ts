@@ -44,8 +44,11 @@ export type ApplyCadRoomsResult = {
     roomId: string;
     roomName: string;
     matchReason: string;
+    regionClass: string;
     deletedWalls: number;
     insertedWalls: number;
+    insertedOpenings: number;
+    sharedWalls: number;
     planWidth: number;
     planDepth: number;
     area: number;
@@ -110,7 +113,11 @@ async function upsertRoomGeometry(
   roomId: string,
   match: MatchedRoomGeometry,
   replace: boolean,
-): Promise<{ deletedWalls: number; insertedWalls: number }> {
+): Promise<{
+  deletedWalls: number;
+  insertedWalls: number;
+  insertedOpenings: number;
+}> {
   const db = getDb();
   const allEntities = await db
     .select()
@@ -159,6 +166,7 @@ async function upsertRoomGeometry(
     value: {
       reason: match.matchReason,
       area: match.region.area,
+      regionClass: match.regionClass,
       bbox: {
         minX: match.region.minX,
         minY: match.region.minY,
@@ -171,6 +179,7 @@ async function upsertRoomGeometry(
   });
 
   let insertedWalls = 0;
+  const wallIds: string[] = [];
   for (const wall of g.walls) {
     const row = await insertEntity({
       projectId,
@@ -180,6 +189,7 @@ async function upsertRoomGeometry(
       name: wall.name,
       spatialAnchor: wall.spatialAnchor,
     });
+    wallIds.push(row.id);
     await upsertAttribute({
       entityId: row.id,
       key: "length",
@@ -211,10 +221,65 @@ async function upsertRoomGeometry(
       confidence: "supported",
       provenance: wall.provenance,
     });
+    if (wall.sharedKey) {
+      await upsertAttribute({
+        entityId: row.id,
+        key: "shared_wall_key",
+        value: wall.sharedKey,
+        confidence: "supported",
+        provenance: wall.provenance,
+      });
+    }
     insertedWalls++;
   }
 
-  return { deletedWalls, insertedWalls };
+  let insertedOpenings = 0;
+  for (const opening of match.openings) {
+    const parentWallId = wallIds[opening.wallIndex];
+    if (!parentWallId) continue;
+    const row = await insertEntity({
+      projectId,
+      parentId: parentWallId,
+      type: "opening",
+      category: opening.category,
+      name: opening.name,
+      spatialAnchor: opening.spatialAnchor,
+    });
+    await upsertAttribute({
+      entityId: row.id,
+      key: "width",
+      value: opening.width,
+      units: "m",
+      confidence: opening.confidence,
+      provenance: opening.provenance,
+    });
+    await upsertAttribute({
+      entityId: row.id,
+      key: "height",
+      value: opening.height,
+      units: "m",
+      confidence: "estimated",
+      provenance: opening.provenance,
+    });
+    await upsertAttribute({
+      entityId: row.id,
+      key: "sill_height",
+      value: opening.sillHeight,
+      units: "m",
+      confidence: "estimated",
+      provenance: opening.provenance,
+    });
+    await upsertAttribute({
+      entityId: row.id,
+      key: "cad_layer",
+      value: opening.layer,
+      confidence: opening.confidence,
+      provenance: opening.provenance,
+    });
+    insertedOpenings++;
+  }
+
+  return { deletedWalls, insertedWalls, insertedOpenings };
 }
 
 export async function applyCadRoomsToProject(input: {
@@ -244,6 +309,8 @@ export async function applyCadRoomsToProject(input: {
       ]),
       config.match?.bathroomName ?? "Bathroom",
       config.match?.closetName ?? "Walk-in Closet",
+      ...(config.match?.hallwayName ? [config.match.hallwayName] : []),
+      ...(config.match?.balconyName ? [config.match.balconyName] : []),
     ];
     const proposal = proposePerRoomWallsFromCad(file, { roomNames, config });
     return {
@@ -257,8 +324,11 @@ export async function applyCadRoomsToProject(input: {
         roomId: "(dry-run)",
         roomName: m.roomName,
         matchReason: m.matchReason,
+        regionClass: m.regionClass,
         deletedWalls: 0,
         insertedWalls: m.geometry.walls.length,
+        insertedOpenings: m.openings.length,
+        sharedWalls: m.geometry.walls.filter((w) => w.sharedKey).length,
         planWidth: m.geometry.planWidth,
         planDepth: m.geometry.planDepth,
         area: m.region.area,
@@ -288,18 +358,17 @@ export async function applyCadRoomsToProject(input: {
       (r) => r.name.toLowerCase() === match.roomName.toLowerCase(),
     );
     if (!room) continue;
-    const { deletedWalls, insertedWalls } = await upsertRoomGeometry(
-      project.id,
-      room.id,
-      match,
-      replace,
-    );
+    const { deletedWalls, insertedWalls, insertedOpenings } =
+      await upsertRoomGeometry(project.id, room.id, match, replace);
     rooms.push({
       roomId: room.id,
       roomName: room.name,
       matchReason: match.matchReason,
+      regionClass: match.regionClass,
       deletedWalls,
       insertedWalls,
+      insertedOpenings,
+      sharedWalls: match.geometry.walls.filter((w) => w.sharedKey).length,
       planWidth: match.geometry.planWidth,
       planDepth: match.geometry.planDepth,
       area: match.region.area,

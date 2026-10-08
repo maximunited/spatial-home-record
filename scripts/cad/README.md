@@ -67,7 +67,13 @@ npm run cad:apply-rooms
 APT54_APPLY_ROOMS=1 npm run import:apt54
 ```
 
-Room-match config: [`apt54-room-match.json`](./apt54-room-match.json) (`APT54_ROOM_MATCH` to override). Matching rules are documented in [IMPORT-APARTMENT-54.md](../../docs/IMPORT-APARTMENT-54.md).
+Room-match config: [`apt54-room-match.json`](./apt54-room-match.json) (`APT54_ROOM_MATCH` to override). Matching rules, openings, and shared-wall model are documented in [IMPORT-APARTMENT-54.md](../../docs/IMPORT-APARTMENT-54.md).
+
+`npm run cad:apply-rooms` also inserts CAD door/window openings onto proposed walls (`wall_local` anchors + confidence). Preview:
+
+```bash
+APT54_DRY_RUN=1 npm run cad:apply-rooms
+```
 
 Then open any room → geometry editor / walkthrough. Living Room still hosts the CAD underlay Evidence dropdown → **CAD underlay (…)**.
 

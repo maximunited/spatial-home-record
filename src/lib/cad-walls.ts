@@ -78,6 +78,22 @@ export type ProposedWall = {
     x1: number;
     y1: number;
   };
+  /**
+   * Apartment-local endpoints (before room translate). Used for opening
+   * assignment and shared-partition detection. Optional for outline mode.
+   */
+  apartmentAnchor?: {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+  };
+  /**
+   * When set, this wall is a partition also represented on another room.
+   * Model: **duplicate OK** — each room keeps its own wall entity in
+   * room-local coords; sharedKey only links the pair for cleanup/UI.
+   */
+  sharedKey?: string;
   length: number;
   height: number;
   thickness: number;

@@ -28,6 +28,20 @@ describe("detail-schemas", () => {
     expect(apartment).toHaveLength(0);
   });
 
+  it("matches climate and occupancy sensor sections", () => {
+    const climate = sectionsForEntity({
+      type: "fixture",
+      category: "temperature_sensor",
+    });
+    expect(climate.some((s) => s.id === "climate_sensor")).toBe(true);
+
+    const occupancy = sectionsForEntity({
+      type: "fixture",
+      category: "occupancy_sensor",
+    });
+    expect(occupancy.some((s) => s.id === "occupancy_sensor")).toBe(true);
+  });
+
   it("parses number and json field values", () => {
     expect(parseFieldValue("number", "2.7")).toBe(2.7);
     expect(parseFieldValue("json", '{"a":1}')).toEqual({ a: 1 });

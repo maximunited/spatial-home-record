@@ -3,6 +3,8 @@ import {
   buildHaExportPackage,
   buildPictureElementsYaml,
   buildZipStore,
+  guessOverlayKind,
+  guessOverlayKindFromHaId,
   haEntityIdLooksLikeCredential,
   renderIsometricSvg,
   resolveCamera,
@@ -59,6 +61,22 @@ describe("ha-export", () => {
       u: 1.0,
       height_affl: 2.2,
     },
+  };
+  const temp = {
+    id: "temp-1",
+    parentId: "room-1",
+    type: "fixture",
+    category: "temperature_sensor",
+    name: "Room Temperature",
+    spatialAnchor: { kind: "room" as const, x: 0.4, y: 1.8, z: 1.5 },
+  };
+  const occupancy = {
+    id: "occ-1",
+    parentId: "room-1",
+    type: "fixture",
+    category: "occupancy_sensor",
+    name: "Room Occupancy",
+    spatialAnchor: { kind: "room" as const, x: 1.0, y: 0.6, z: 2.4 },
   };
   const attrs = [
     { entityId: "room-1", key: "plan_width", value: 4.2 },
@@ -187,6 +205,102 @@ describe("ha-export", () => {
     expect(
       haEntityIdLooksLikeCredential("sensor.authorization_code"),
     ).toBe(true);
+  });
+
+  it("classifies climate and occupancy overlay kinds", () => {
+    expect(guessOverlayKindFromHaId("sensor.living_room_temperature")).toBe(
+      "climate",
+    );
+    expect(
+      guessOverlayKindFromHaId("binary_sensor.living_room_occupancy"),
+    ).toBe("occupancy");
+    expect(
+      guessOverlayKind(temp, "sensor.living_room_temperature"),
+    ).toBe("climate");
+    expect(
+      guessOverlayKind(occupancy, "binary_sensor.living_room_occupancy"),
+    ).toBe("occupancy");
+  });
+
+  it("emits climate state-badge and occupancy state-icon", () => {
+    const yaml = buildPictureElementsYaml({
+      title: "Living Room Isometric",
+      imagePath: "/local/spatial-home-record/isometric.svg",
+      mappings: [
+        {
+          entityId: temp.id,
+          haEntityId: "sensor.living_room_temperature",
+          label: "Temp",
+        },
+        {
+          entityId: occupancy.id,
+          haEntityId: "binary_sensor.living_room_occupancy",
+          label: "Occupancy",
+        },
+      ],
+      overlayPositions: new Map([
+        [temp.id, { left: "20%", top: "40%" }],
+        [occupancy.id, { left: "30%", top: "25%" }],
+      ]),
+      options: { include_climate_overlays: true },
+    });
+    expect(yaml).toContain("sensor.living_room_temperature");
+    expect(yaml).toContain("binary_sensor.living_room_occupancy");
+    expect(yaml).toMatch(/type: state-badge[\s\S]*sensor\.living_room_temperature/);
+    expect(yaml).toMatch(
+      /type: state-icon[\s\S]*binary_sensor\.living_room_occupancy/,
+    );
+  });
+
+  it("omits climate overlays when include_climate_overlays is false", () => {
+    const yaml = buildPictureElementsYaml({
+      title: "Living Room Isometric",
+      imagePath: "/local/spatial-home-record/isometric.svg",
+      mappings: [
+        {
+          entityId: temp.id,
+          haEntityId: "sensor.living_room_temperature",
+        },
+        {
+          entityId: light.id,
+          haEntityId: "light.living_room_ceiling",
+        },
+      ],
+      overlayPositions: new Map([
+        [temp.id, { left: "20%", top: "40%" }],
+        [light.id, { left: "40%", top: "30%" }],
+      ]),
+      options: {
+        include_climate_overlays: false,
+        include_light_overlays: true,
+      },
+    });
+    expect(yaml).not.toContain("sensor.living_room_temperature");
+    expect(yaml).toContain("light.living_room_ceiling");
+  });
+
+  it("marks climate and occupancy in isometric svg", () => {
+    const scene = buildRoomScene(room, [room, wall, temp, occupancy], attrs);
+    const svg = renderIsometricSvg(scene, resolveCamera(null), [
+      {
+        entityId: temp.id,
+        label: "Temp",
+        x: 120,
+        y: 140,
+        kind: "climate",
+      },
+      {
+        entityId: occupancy.id,
+        label: "Occ",
+        x: 180,
+        y: 100,
+        kind: "occupancy",
+      },
+    ]);
+    expect(svg).toContain('data-kind="climate"');
+    expect(svg).toContain('data-kind="occupancy"');
+    expect(svg).toContain("#34d399");
+    expect(svg).toContain("#a78bfa");
   });
 
   it("packages zip with manifest and animation assets", () => {

@@ -358,6 +358,14 @@ async function main() {
     name: "Room Temperature",
     spatialAnchor: { kind: "room", x: 0.4, y: 1.8, z: 1.5 },
   });
+  const occupancySensor = await insertEntity({
+    projectId: project.id,
+    parentId: room.id,
+    type: "fixture",
+    category: "occupancy_sensor",
+    name: "Room Occupancy",
+    spatialAnchor: { kind: "room", x: 1.0, y: 0.6, z: 2.4 },
+  });
 
   // Floor tiles
   await upsertAttribute({
@@ -504,6 +512,56 @@ async function main() {
     value: "Runs to media cabinet patch panel",
     confidence: "supported",
     provenance: "construction_photo",
+  });
+
+  // Climate / occupancy indicators (attrs only — live values stay in HA)
+  await upsertAttribute({
+    entityId: tempSensor.id,
+    key: "unit",
+    value: "°C",
+    confidence: "confirmed",
+  });
+  await upsertAttribute({
+    entityId: tempSensor.id,
+    key: "mount_location",
+    value: "West wall / 1.5 m AFFL",
+    confidence: "supported",
+  });
+  await upsertAttribute({
+    entityId: tempSensor.id,
+    key: "reading_note",
+    value: "Typical indoor range 18–26 °C",
+    confidence: "estimated",
+  });
+  await upsertAttribute({
+    entityId: tempSensor.id,
+    key: "ha_entity_hint",
+    value: "sensor.living_room_temperature",
+    confidence: "confirmed",
+  });
+  await upsertAttribute({
+    entityId: occupancySensor.id,
+    key: "detection_mode",
+    value: "motion",
+    confidence: "confirmed",
+  });
+  await upsertAttribute({
+    entityId: occupancySensor.id,
+    key: "mount_location",
+    value: "Ceiling near south entry",
+    confidence: "supported",
+  });
+  await upsertAttribute({
+    entityId: occupancySensor.id,
+    key: "coverage_note",
+    value: "Covers seating + entry path",
+    confidence: "estimated",
+  });
+  await upsertAttribute({
+    entityId: occupancySensor.id,
+    key: "ha_entity_hint",
+    value: "binary_sensor.living_room_occupancy",
+    confidence: "confirmed",
   });
 
   // Cabinet volume (estimated footprint for walkthrough — not surveyed)
@@ -737,12 +795,19 @@ async function main() {
         actions: { tap: "more-info" },
         label: "Temp",
       },
+      {
+        entityId: occupancySensor.id,
+        haEntityId: "binary_sensor.living_room_occupancy",
+        actions: { tap: "more-info" },
+        label: "Occupancy",
+      },
     ],
     options: {
       include_light_overlays: true,
+      include_climate_overlays: true,
       animated: true,
       animation_mode: "custom-cards",
-      note: "Blind/fan use PNG frame sequences (ha-blinds-frame-card / ha-fan-loop-card); see animations/README.md",
+      note: "Blind/fan PNG sequences; climate = state-badge; occupancy = state-icon; see animations/README.md",
     },
   });
 

@@ -10,6 +10,7 @@ import {
 } from "@react-three/drei";
 import { useCallback, useMemo, useState } from "react";
 import type {
+  ClimateIndicator,
   PhotoHotspot,
   WalkthroughMesh,
   WalkthroughScene,
@@ -100,6 +101,47 @@ function HotspotMarker({
   );
 }
 
+function ClimateIndicatorMarker({
+  indicator,
+  selected,
+  onSelect,
+}: {
+  indicator: ClimateIndicator;
+  selected: boolean;
+  onSelect: (entityId: string) => void;
+}) {
+  const accent =
+    indicator.kind === "climate"
+      ? selected
+        ? "bg-emerald-700"
+        : "bg-emerald-600/90"
+      : selected
+        ? "bg-violet-700"
+        : "bg-violet-600/90";
+  const kindLabel = indicator.kind === "climate" ? "Climate" : "Occupancy";
+  return (
+    <group position={indicator.position}>
+      <Html distanceFactor={7} center>
+        <button
+          type="button"
+          className={`pointer-events-auto max-w-[160px] rounded px-1.5 py-1 text-left text-[10px] text-white shadow-sm ${accent}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(indicator.entityId);
+          }}
+        >
+          <span className="font-medium">
+            {kindLabel} · {indicator.name}
+          </span>
+          <span className="mt-0.5 block truncate opacity-90">
+            {indicator.caption}
+          </span>
+        </button>
+      </Html>
+    </group>
+  );
+}
+
 function SceneContents({
   scene,
   selectedEntityId,
@@ -156,6 +198,14 @@ function SceneContents({
             key={h.id}
             hotspot={h}
             selected={selectedEntityId === h.entityId}
+            onSelect={onSelectEntity}
+          />
+        ))}
+        {scene.climateIndicators.map((c) => (
+          <ClimateIndicatorMarker
+            key={c.id}
+            indicator={c}
+            selected={selectedEntityId === c.entityId}
             onSelect={onSelectEntity}
           />
         ))}
@@ -284,6 +334,12 @@ export function WalkthroughViewer({
     () => scene.hotspots.find((h) => h.entityId === selectedEntityId),
     [scene.hotspots, selectedEntityId],
   );
+  const selectedClimate = useMemo(
+    () =>
+      scene.climateIndicators.find((c) => c.entityId === selectedEntityId) ??
+      null,
+    [scene.climateIndicators, selectedEntityId],
+  );
   const estimatedCount = scene.meshes.filter((m) => m.estimated).length;
 
   return (
@@ -394,6 +450,12 @@ export function WalkthroughViewer({
               {selectedHotspot ? (
                 <p className="mt-1 text-xs text-zinc-600">
                   {selectedHotspot.summary}
+                </p>
+              ) : null}
+              {selectedClimate ? (
+                <p className="mt-1 text-xs text-zinc-600">
+                  {selectedClimate.kind === "climate" ? "Climate" : "Occupancy"}
+                  : {selectedClimate.caption}
                 </p>
               ) : null}
               {!shareMode ? (

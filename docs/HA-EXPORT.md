@@ -21,6 +21,7 @@ Frames are generated procedurally in [`src/lib/ha-export-animations.ts`](../src/
 | Option | Default | Effect |
 | ------ | ------- | ------ |
 | `include_light_overlays` | `true` | Emit `state-icon` for `light.*` |
+| `include_climate_overlays` | `true` | Emit climate `state-badge` + occupancy `state-icon` |
 | `animated` | seed: `true` | Emit frame overlays for `cover.*` / `fan.*` |
 | `animation_mode` | `custom-cards` | `custom-cards` or `state-image` |
 
@@ -28,6 +29,8 @@ Living Room Pilot seed maps:
 
 - `cover.living_room_blind` → East Blind
 - `fan.living_room` → Ceiling Fan
+- `sensor.living_room_temperature` → Room Temperature (`state-badge`)
+- `binary_sensor.living_room_occupancy` → Room Occupancy (`state-icon`)
 
 ## Animation modes
 

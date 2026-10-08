@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildClimateIndicators,
   buildStructuralMeshes,
   buildWalkthroughScene,
   countEstimatedMeshes,
@@ -172,5 +173,61 @@ describe("walkthrough-scene", () => {
     expect(scene.hotspots).toHaveLength(1);
     expect(scene.hotspots[0]?.stub).toBe(false);
     expect(scene.hotspots[0]?.evidenceId).toBe("ev-1");
+  });
+
+  it("builds climate and occupancy indicators from fixtures", () => {
+    const temp = {
+      id: "temp-1",
+      parentId: "room-1",
+      type: "fixture",
+      category: "temperature_sensor",
+      name: "Room Temperature",
+      spatialAnchor: { kind: "room", x: 0.4, y: 1.8, z: 1.5 },
+    };
+    const occ = {
+      id: "occ-1",
+      parentId: "room-1",
+      type: "fixture",
+      category: "occupancy_sensor",
+      name: "Room Occupancy",
+      spatialAnchor: { kind: "room", x: 1.0, y: 0.6, z: 2.4 },
+    };
+    const sensorAttrs = [
+      ...attrs,
+      { entityId: "temp-1", key: "unit", value: "°C" },
+      {
+        entityId: "temp-1",
+        key: "reading_note",
+        value: "Typical indoor range 18–26 °C",
+      },
+      { entityId: "occ-1", key: "detection_mode", value: "motion" },
+      {
+        entityId: "occ-1",
+        key: "ha_entity_hint",
+        value: "binary_sensor.living_room_occupancy",
+      },
+    ];
+    const scene = buildWalkthroughScene(
+      room,
+      [room, ...walls, temp, occ],
+      sensorAttrs,
+      [],
+    );
+    expect(scene.climateIndicators).toHaveLength(2);
+    const climate = scene.climateIndicators.find((c) => c.kind === "climate");
+    const occupancy = scene.climateIndicators.find(
+      (c) => c.kind === "occupancy",
+    );
+    expect(climate?.caption).toContain("18–26");
+    expect(occupancy?.caption).toContain("binary_sensor.living_room_occupancy");
+    const tempMesh = scene.meshes.find((m) => m.entityId === "temp-1");
+    const occMesh = scene.meshes.find((m) => m.entityId === "occ-1");
+    expect(tempMesh?.color).toBe("#34d399");
+    expect(occMesh?.color).toBe("#a78bfa");
+
+    const roomScene = buildRoomScene(room, [room, ...walls, temp, occ], sensorAttrs);
+    expect(
+      buildClimateIndicators(roomScene, [temp, occ], sensorAttrs),
+    ).toHaveLength(2);
   });
 });

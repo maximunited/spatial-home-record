@@ -147,9 +147,17 @@ export function renderIsometricSvg(
               ? "#fb923c"
               : o.kind === "climate"
                 ? "#34d399"
-                : "#60a5fa";
-      return `<g data-entity="${escapeXml(o.entityId)}">
+                : o.kind === "occupancy"
+                  ? "#a78bfa"
+                  : "#60a5fa";
+      const glyph =
+        o.kind === "climate" ? "°" : o.kind === "occupancy" ? "●" : "";
+      const glyphSvg = glyph
+        ? `<text x="${o.x}" y="${o.y + 3.5}" text-anchor="middle" font-size="11" font-family="system-ui,sans-serif" fill="#18181b" font-weight="600">${glyph}</text>`
+        : "";
+      return `<g data-entity="${escapeXml(o.entityId)}" data-kind="${escapeXml(o.kind)}">
     <circle cx="${o.x}" cy="${o.y}" r="8" fill="${fill}" stroke="#18181b" stroke-width="1.25"/>
+    ${glyphSvg}
     <text x="${o.x}" y="${o.y - 12}" text-anchor="middle" font-size="10" font-family="system-ui,sans-serif" fill="#27272a">${escapeXml(o.label)}</text>
   </g>`;
     })
@@ -272,6 +280,7 @@ export function buildPictureElementsYaml(input: {
   animations?: AnimationBundle;
 }): string {
   const includeLights = input.options?.include_light_overlays !== false;
+  const includeClimate = input.options?.include_climate_overlays !== false;
   const animated = Boolean(input.options?.animated);
   const animationMode = resolveAnimationMode(input.options);
   const animations = input.animations ?? buildAnimationBundle();
@@ -285,7 +294,15 @@ export function buildPictureElementsYaml(input: {
       top: "50%",
     };
     const domain = m.haEntityId.split(".")[0] ?? "sensor";
+    const overlayKind = guessOverlayKindFromHaId(m.haEntityId, m.label);
     const style = overlayStyle(pos, m.style);
+
+    if (
+      !includeClimate &&
+      (overlayKind === "climate" || overlayKind === "occupancy")
+    ) {
+      continue;
+    }
 
     if (domain === "light" && includeLights) {
       elements.push({
@@ -295,6 +312,38 @@ export function buildPictureElementsYaml(input: {
         tap_action: m.actions?.tap
           ? { action: String(m.actions.tap) }
           : { action: "toggle" },
+      });
+    } else if (overlayKind === "occupancy" || domain === "binary_sensor") {
+      // Motion / presence: icon that flips with on/off (or home/away).
+      elements.push({
+        type: "state-icon",
+        entity: m.haEntityId,
+        style: overlayStyle(pos, m.style, {
+          "--paper-item-icon-color": "#7c3aed",
+          transform: "translate(-50%, -50%) scale(1.15)",
+        }),
+        tap_action: m.actions?.tap
+          ? { action: String(m.actions.tap) }
+          : { action: "more-info" },
+      });
+    } else if (
+      overlayKind === "climate" ||
+      domain === "sensor" ||
+      domain === "climate"
+    ) {
+      // Temperature / climate: state-badge shows the live numeric reading in HA.
+      elements.push({
+        type: "state-badge",
+        entity: m.haEntityId,
+        style: overlayStyle(pos, m.style, {
+          transform: "translate(-50%, -50%)",
+          fontSize: "0.85em",
+          backgroundColor: "rgba(16, 185, 129, 0.18)",
+          borderRadius: "999px",
+        }),
+        tap_action: m.actions?.tap
+          ? { action: String(m.actions.tap) }
+          : { action: "more-info" },
       });
     } else if (domain === "cover") {
       if (animated && animationMode === "custom-cards") {
@@ -378,6 +427,7 @@ export function buildPictureElementsYaml(input: {
         });
       }
     } else {
+      // media_player and other domains: badge with more-info.
       elements.push({
         type: "state-badge",
         entity: m.haEntityId,
@@ -489,15 +539,63 @@ export function overlayScreenPositions(
   return { overlays, cssPositions };
 }
 
-function guessOverlayKind(
+export type HaOverlayKind =
+  | "light"
+  | "fan"
+  | "blind"
+  | "climate"
+  | "occupancy"
+  | "media"
+  | "generic";
+
+/** Classify overlay from HA entity id alone (YAML path before entity join). */
+export function guessOverlayKindFromHaId(
+  haEntityId: string,
+  label?: string,
+): HaOverlayKind {
+  const domain = haEntityId.split(".")[0] ?? "";
+  const id = haEntityId.toLowerCase();
+  const labelLower = (label ?? "").toLowerCase();
+  if (domain === "light") return "light";
+  if (domain === "fan") return "fan";
+  if (domain === "cover") return "blind";
+  if (
+    domain === "binary_sensor" ||
+    id.includes("occupancy") ||
+    id.includes("motion") ||
+    id.includes("presence") ||
+    labelLower.includes("occupancy") ||
+    labelLower.includes("motion")
+  ) {
+    return "occupancy";
+  }
+  if (
+    domain === "climate" ||
+    domain === "sensor" ||
+    id.includes("temperature") ||
+    id.includes("humidity") ||
+    labelLower.includes("temp")
+  ) {
+    return "climate";
+  }
+  if (domain === "media_player") return "media";
+  return "generic";
+}
+
+export function guessOverlayKind(
   ent: EntityLike,
   haEntityId: string,
-): string {
-  const domain = haEntityId.split(".")[0] ?? "";
-  if (domain === "light" || ent.category === "smart_light") return "light";
-  if (domain === "fan" || ent.category === "fan") return "fan";
-  if (domain === "cover" || ent.category === "blind") return "blind";
-  if (domain === "climate" || domain === "sensor") return "climate";
+): HaOverlayKind {
+  const cat = ent.category ?? "";
+  if (cat === "occupancy_sensor") return "occupancy";
+  if (cat === "temperature_sensor" || cat === "humidity_sensor") {
+    return "climate";
+  }
+  if (cat === "smart_light") return "light";
+  if (cat === "fan") return "fan";
+  if (cat === "blind") return "blind";
+  const fromHa = guessOverlayKindFromHaId(haEntityId);
+  if (fromHa !== "generic") return fromHa;
   if (ent.type === "appliance") return "media";
   return "generic";
 }

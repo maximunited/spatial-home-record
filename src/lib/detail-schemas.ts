@@ -190,6 +190,68 @@ export const DETAIL_SECTIONS: DetailSectionDef[] = [
       { key: "swing", label: "Swing / notes", kind: "text" },
     ],
   },
+  {
+    id: "climate_sensor",
+    title: "Climate sensor",
+    match: (e) =>
+      e.category === "temperature_sensor" || e.category === "humidity_sensor",
+    fields: [
+      {
+        key: "unit",
+        label: "Display unit",
+        kind: "text",
+        placeholder: "°C",
+      },
+      {
+        key: "mount_location",
+        label: "Mount location",
+        kind: "text",
+        placeholder: "North wall / 1.5 m AFFL",
+      },
+      {
+        key: "reading_note",
+        label: "Reading note",
+        kind: "text",
+        placeholder: "Typical range / calibration",
+      },
+      {
+        key: "ha_entity_hint",
+        label: "HA entity hint",
+        kind: "text",
+        placeholder: "sensor.living_room_temperature",
+      },
+    ],
+  },
+  {
+    id: "occupancy_sensor",
+    title: "Occupancy sensor",
+    match: (e) => e.category === "occupancy_sensor",
+    fields: [
+      {
+        key: "detection_mode",
+        label: "Detection mode",
+        kind: "text",
+        placeholder: "motion / presence / mmWave",
+      },
+      {
+        key: "mount_location",
+        label: "Mount location",
+        kind: "text",
+        placeholder: "Ceiling near entry",
+      },
+      {
+        key: "coverage_note",
+        label: "Coverage note",
+        kind: "text",
+      },
+      {
+        key: "ha_entity_hint",
+        label: "HA entity hint",
+        kind: "text",
+        placeholder: "binary_sensor.living_room_occupancy",
+      },
+    ],
+  },
 ];
 
 export function sectionsForEntity(entity: {

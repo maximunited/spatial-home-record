@@ -52,10 +52,22 @@ export type PhotoHotspot = {
   stub: boolean;
 };
 
+/** Floating climate / occupancy badge in the walkthrough (attrs only — no live HA). */
+export type ClimateIndicator = {
+  id: string;
+  entityId: string;
+  kind: "climate" | "occupancy";
+  name: string;
+  /** Human caption from local attributes (unit / mode), not a live reading. */
+  caption: string;
+  position: Vec3;
+};
+
 export type WalkthroughScene = {
   room: RoomScene;
   meshes: WalkthroughMesh[];
   hotspots: PhotoHotspot[];
+  climateIndicators: ClimateIndicator[];
   /** Camera start: eye height near room center looking toward media wall. */
   defaultCamera: {
     position: Vec3;
@@ -226,11 +238,18 @@ function propSizeFor(
       color: cat === "fan" ? "#a8a29e" : "#fef08a",
     };
   }
-  if (cat === "temperature_sensor" || cat === "occupancy_sensor") {
+  if (cat === "temperature_sensor" || cat === "humidity_sensor") {
     return {
       size: [0.12, 0.12, 0.06],
       estimated: true,
-      color: "#38bdf8",
+      color: "#34d399",
+    };
+  }
+  if (cat === "occupancy_sensor") {
+    return {
+      size: [0.12, 0.12, 0.06],
+      estimated: true,
+      color: "#a78bfa",
     };
   }
   if (ent.type === "technical_point") {
@@ -460,6 +479,63 @@ export function buildPhotoHotspots(
   return hotspots;
 }
 
+function attrString(
+  attrs: AttrLike[],
+  key: string,
+): string | null {
+  const row = attrs.find((a) => a.key === key);
+  if (!row || row.value === null || row.value === undefined) return null;
+  if (typeof row.value === "string") return row.value;
+  if (typeof row.value === "number" || typeof row.value === "boolean") {
+    return String(row.value);
+  }
+  return null;
+}
+
+export function buildClimateIndicators(
+  scene: RoomScene,
+  entities: EntityLike[],
+  attributes: AttrLike[],
+): ClimateIndicator[] {
+  const indicators: ClimateIndicator[] = [];
+  for (const ent of entities) {
+    const cat = ent.category ?? "";
+    const kind: "climate" | "occupancy" | null =
+      cat === "temperature_sensor" || cat === "humidity_sensor"
+        ? "climate"
+        : cat === "occupancy_sensor"
+          ? "occupancy"
+          : null;
+    if (!kind) continue;
+    const attrs = attrsFor(ent.id, attributes);
+    const world = entityWorldPoint(ent, scene);
+    let caption: string;
+    if (kind === "climate") {
+      const unit = attrString(attrs, "unit") ?? "°C";
+      const haHint = attrString(attrs, "ha_entity_hint");
+      const note = attrString(attrs, "reading_note");
+      caption =
+        note ??
+        (haHint ? `${unit} · bound ${haHint}` : `${unit} · bind in HA export`);
+    } else {
+      const mode = attrString(attrs, "detection_mode") ?? "motion";
+      const haHint = attrString(attrs, "ha_entity_hint");
+      caption = haHint
+        ? `${mode} · bound ${haHint}`
+        : `${mode} · bind in HA export`;
+    }
+    indicators.push({
+      id: `climate:${ent.id}`,
+      entityId: ent.id,
+      kind,
+      name: ent.name,
+      caption,
+      position: planToThree(world.x, world.y, world.z + 0.28),
+    });
+  }
+  return indicators;
+}
+
 export function buildWalkthroughScene(
   room: EntityLike,
   entities: EntityLike[],
@@ -472,12 +548,18 @@ export function buildWalkthroughScene(
     ...buildPropMeshes(roomScene, entities, attributes),
   ];
   const hotspots = buildPhotoHotspots(roomScene, entities, evidenceLinks);
+  const climateIndicators = buildClimateIndicators(
+    roomScene,
+    entities,
+    attributes,
+  );
   const { width, depth } = roomScene.plan;
 
   return {
     room: roomScene,
     meshes,
     hotspots,
+    climateIndicators,
     defaultCamera: {
       position: planToThree(width * 0.35, depth * 0.25, 1.6),
       target: planToThree(width * 0.5, depth * 0.85, 1.2),

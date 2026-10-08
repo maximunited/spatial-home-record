@@ -17,6 +17,7 @@ Evidence-backed spatial home record: structured apartment entities with per-attr
 - **Current-photo capture** — Apt 54 room checklist; IRL shoot then upload as `phase: current` ([docs/CURRENT-PHOTOS.md](docs/CURRENT-PHOTOS.md))
 - **Private share links** — `/share/[token]` with layer permissions; documents/payments never included ([docs/SHARE-LINKS.md](docs/SHARE-LINKS.md))
 - **Climate / occupancy** — walkthrough badges + HA Picture Elements climate badges / occupancy icons (seed Living Room)
+- **Model-snapshot re-export diffs** — HA download snapshots scene, ships `export-diff.json`, preserves profile mappings ([docs/HA-EXPORT.md](docs/HA-EXPORT.md))
 - CI: unit + Postgres integration
 
 ## Setup

@@ -16,7 +16,7 @@ Source of truth is Postgres (Neon or local; CI uses Postgres 16). The app connec
 | `measurements` | Dimension values with endpoints |
 | `capture_tasks` | Guided capture checklist items |
 | `ha_export_profiles` | Entity↔HA mappings + camera (no credentials) |
-| `model_snapshots` | Versioned scene snapshots |
+| `model_snapshots` | Versioned scene snapshots for HA re-export diffs (`scene` JSON, optional baseline) |
 | `share_links` | Private share tokens, optional passcode hash, expiry, layer flags |
 
 Schema lives in [`src/db/schema.ts`](../src/db/schema.ts). SQL migrations: [`drizzle/0000_init_spatial_schema.sql`](../drizzle/0000_init_spatial_schema.sql), [`drizzle/0001_share_links.sql`](../drizzle/0001_share_links.sql).
@@ -100,11 +100,14 @@ Rich editable forms (empty generic sections stay hidden; schema-matched sections
 | `picture-elements.yaml` | Lovelace view |
 | `assets/isometric.svg` | Base image |
 | `mappings.json` | Profile mappings + camera/options |
+| `export-diff.json` | Diff vs baseline/latest model snapshot |
 | `animations/blind_XXX.png` | Cover position frames (0 = open … last = closed) |
 | `animations/fan_XXX.png` | Fan loop frames |
 | `animations/README.md` | Custom-card install + stock PE fallback |
 
 `options.animated: true` (seed default) emits position-based blind + speed-based fan overlays. `options.animation_mode` is `custom-cards` (default: `ha-blinds-frame-card` / `ha-fan-loop-card`) or `state-image` (stock picture-elements keyframes). See [HA-EXPORT.md](HA-EXPORT.md).
+
+Re-export: each HA ZIP download appends `export-diff.json` and inserts a `model_snapshots` row. Diffs compare the current lean scene to the baseline (or latest) snapshot; mappings on the profile are preserved. Helpers: [`src/lib/model-snapshot.ts`](../src/lib/model-snapshot.ts).
 
 ## Share links
 

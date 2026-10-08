@@ -1,9 +1,18 @@
 import { notFound } from "next/navigation";
 import { HaExportPanel } from "@/components/ha-export-panel";
+import { ReExportDiffPanel } from "@/components/re-export-diff-panel";
 import { ProjectNav } from "@/components/shell";
 import type { HaMapping } from "@/lib/ha-export";
 import {
+  asModelScene,
+  buildModelScene,
+  diffModelScenes,
+} from "@/lib/model-snapshot";
+import {
+  getCompareModelSnapshot,
+  getLatestModelSnapshot,
   getProject,
+  listAttributesForEntities,
   listEntitiesByProject,
   listHaExportProfiles,
 } from "@/lib/projects";
@@ -20,6 +29,18 @@ export default async function HaExportPage({
   if (!project) notFound();
   const profiles = await listHaExportProfiles(id);
   const entities = await listEntitiesByProject(id);
+  const attributes = await listAttributesForEntities(entities.map((e) => e.id));
+  const currentScene = buildModelScene(entities, attributes);
+  const compareSnapshot = await getCompareModelSnapshot(id);
+  const latestSnapshot = await getLatestModelSnapshot(id);
+  const allMappings = profiles.flatMap(
+    (p) => (p.mappings ?? []) as HaMapping[],
+  );
+  const diff = diffModelScenes(
+    compareSnapshot ? asModelScene(compareSnapshot.scene) : null,
+    currentScene,
+    allMappings,
+  );
 
   return (
     <div>
@@ -31,9 +52,33 @@ export default async function HaExportPage({
         <p className="mt-1 text-sm text-zinc-600">
           Configure entity↔HA mappings and download a Picture Elements package
           (YAML + isometric SVG + manifest). Home Assistant credentials are never
-          stored here.
+          stored here. Re-exports preserve mappings and record scene diffs.
         </p>
         <div className="mt-6">
+          <ReExportDiffPanel
+            projectId={id}
+            diff={diff}
+            compareSnapshot={
+              compareSnapshot
+                ? {
+                    id: compareSnapshot.id,
+                    label: compareSnapshot.label,
+                    isBaseline: compareSnapshot.isBaseline,
+                    createdAt: compareSnapshot.createdAt,
+                  }
+                : null
+            }
+            latestSnapshot={
+              latestSnapshot
+                ? {
+                    id: latestSnapshot.id,
+                    label: latestSnapshot.label,
+                    isBaseline: latestSnapshot.isBaseline,
+                    createdAt: latestSnapshot.createdAt,
+                  }
+                : null
+            }
+          />
           <HaExportPanel
             projectId={id}
             profiles={profiles.map((p) => ({

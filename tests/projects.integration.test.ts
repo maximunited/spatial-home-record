@@ -2,15 +2,19 @@ import "dotenv/config";
 import { afterAll, describe, expect, it } from "vitest";
 import { closeDb } from "@/db/client";
 import {
+  createModelSnapshot,
   createProject,
+  getCompareModelSnapshot,
   getEntityBundle,
   getHaExportProfile,
+  getLatestModelSnapshot,
   insertEntity,
   insertRelationship,
   listAttributesForEntities,
   listEntitiesByProject,
   listEvidenceForEntity,
   searchEntities,
+  setModelSnapshotBaseline,
   updateEntitySpatialAnchor,
   updateHaExportProfile,
   upsertAttribute,
@@ -24,6 +28,11 @@ import {
 import { pickPhasePhotos } from "@/lib/wall-photo-compare";
 import { buildRoomScene } from "@/lib/geometry";
 import { buildHaExportPackage } from "@/lib/ha-export";
+import {
+  asModelScene,
+  buildModelScene,
+  diffModelScenes,
+} from "@/lib/model-snapshot";
 import { getDb } from "@/db/client";
 import { evidence, evidenceLinks, haExportProfiles } from "@/db/schema";
 import {
@@ -271,6 +280,92 @@ describe.runIf(hasDb)("projects integration", () => {
       });
       expect(pkg.pictureElementsYaml).toContain("light.test_updated");
       expect(pkg.isometricSvg).toContain("<svg");
+    },
+    30_000,
+  );
+
+  it(
+    "stores model snapshots and diffs scene changes for re-export",
+    async () => {
+      const project = await createProject({
+        name: `Snapshots ${Date.now()}`,
+      });
+      const room = await insertEntity({
+        projectId: project.id,
+        type: "room",
+        name: "Living",
+      });
+      await upsertAttribute({
+        entityId: room.id,
+        key: "plan_width",
+        value: 4,
+        confidence: "estimated",
+      });
+      const light = await insertEntity({
+        projectId: project.id,
+        parentId: room.id,
+        type: "fixture",
+        category: "smart_light",
+        name: "Light",
+        spatialAnchor: { kind: "room", x: 1, y: 1, z: 2 },
+      });
+
+      const entities = await listEntitiesByProject(project.id);
+      const attributes = await listAttributesForEntities(
+        entities.map((e) => e.id),
+      );
+      const scene1 = buildModelScene(entities, attributes);
+      const snap1 = await createModelSnapshot({
+        projectId: project.id,
+        label: "baseline",
+        scene: scene1,
+        isBaseline: true,
+      });
+      expect(snap1.isBaseline).toBe(true);
+
+      await insertEntity({
+        projectId: project.id,
+        parentId: room.id,
+        type: "fixture",
+        category: "fan",
+        name: "Fan",
+        spatialAnchor: { kind: "room", x: 2, y: 2, z: 2.5 },
+      });
+      await updateEntitySpatialAnchor({
+        projectId: project.id,
+        entityId: light.id,
+        spatialAnchor: { kind: "room", x: 1.5, y: 1, z: 2 },
+      });
+
+      const entities2 = await listEntitiesByProject(project.id);
+      const attrs2 = await listAttributesForEntities(
+        entities2.map((e) => e.id),
+      );
+      const scene2 = buildModelScene(entities2, attrs2);
+      const compare = await getCompareModelSnapshot(project.id);
+      expect(compare?.id).toBe(snap1.id);
+
+      const diff = diffModelScenes(
+        asModelScene(compare!.scene),
+        scene2,
+        [{ entityId: light.id, haEntityId: "light.test" }],
+      );
+      expect(diff.added.some((e) => e.name === "Fan")).toBe(true);
+      expect(diff.changed.some((e) => e.id === light.id)).toBe(true);
+
+      const snap2 = await createModelSnapshot({
+        projectId: project.id,
+        label: "ha-export:Test",
+        scene: scene2,
+      });
+      expect(snap2.isBaseline).toBe(false);
+      const latest = await getLatestModelSnapshot(project.id);
+      expect(latest?.id).toBe(snap2.id);
+
+      const promoted = await setModelSnapshotBaseline(project.id, snap2.id);
+      expect(promoted?.isBaseline).toBe(true);
+      const compareAfter = await getCompareModelSnapshot(project.id);
+      expect(compareAfter?.id).toBe(snap2.id);
     },
     30_000,
   );

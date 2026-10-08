@@ -26,5 +26,6 @@ Shipped chunks for the living-room vertical slice:
 7. **Current-photo capture** — guided `capture_tasks` per Apt 54 room; complete on `/projects/[id]/capture` with IRL uploads tagged `phase: current` ([CURRENT-PHOTOS.md](CURRENT-PHOTOS.md))
 8. **Private share links** — tokenized `/share/[token]` with layer flags (walkthrough / dimensions / technical / inventory); documents & payments never included; optional passcode + expiry + revoke ([SHARE-LINKS.md](SHARE-LINKS.md))
 9. **Climate / occupancy indicators** — temperature + occupancy fixtures in seed; walkthrough floating badges (attrs / HA hints, not live sync); HA export `state-badge` (climate) + `state-icon` (occupancy) with `include_climate_overlays`; detail forms for mount/mode/unit
+10. **Model-snapshot re-export diffs** — `model_snapshots` scene captures on HA download; `export-diff.json` + UI summary (added/removed/changed, orphaned mappings, unmapped exportables); baseline compare; profile HA mappings preserved across re-exports
 
-Still open vs full north star: OCR/CV, live HA sync, deeper redaction pipeline, model-snapshot re-export diffs, photoreal materials, optional WebM packaging (ffmpeg) for desktop custom cards.
+Still open vs full north star: OCR/CV, live HA sync, deeper redaction pipeline, photoreal materials, optional WebM packaging (ffmpeg) for desktop custom cards, completeness agent (later).

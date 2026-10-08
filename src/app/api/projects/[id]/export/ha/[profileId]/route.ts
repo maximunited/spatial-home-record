@@ -5,7 +5,15 @@ import {
   type HaMapping,
 } from "@/lib/ha-export";
 import {
+  asModelScene,
+  buildExportDiffDocument,
+  buildModelScene,
+  diffModelScenes,
+} from "@/lib/model-snapshot";
+import {
+  createModelSnapshot,
   findRoomForProject,
+  getCompareModelSnapshot,
   getHaExportProfile,
   getProject,
   listAttributesForEntities,
@@ -47,17 +55,41 @@ export async function GET(
 
   const entities = await listEntitiesByProject(projectId);
   const attributes = await listAttributesForEntities(entities.map((e) => e.id));
+  const mappings = (profile.mappings ?? []) as HaMapping[];
+
+  const currentScene = buildModelScene(entities, attributes);
+  const prior = await getCompareModelSnapshot(projectId);
+  const priorScene = prior ? asModelScene(prior.scene) : null;
+  const diff = diffModelScenes(priorScene, currentScene, mappings);
+  const exportDiff = buildExportDiffDocument({
+    diff,
+    priorSnapshotId: prior?.id ?? null,
+    priorSnapshotLabel: prior?.label ?? null,
+  });
 
   const pkg = buildHaExportPackage({
     projectId,
     profileId: profile.id,
     profileName: profile.name,
     camera: profile.camera,
-    mappings: (profile.mappings ?? []) as HaMapping[],
+    mappings,
     options: profile.options,
     room,
     entities,
     attributes,
+  });
+
+  pkg.manifest.files = [...pkg.manifest.files, "export-diff.json"];
+  pkg.manifest.notes = [
+    ...pkg.manifest.notes,
+    `Re-export diff: ${exportDiff.summary}`,
+  ];
+
+  await createModelSnapshot({
+    projectId,
+    label: `ha-export:${profile.name}`,
+    scene: currentScene,
+    isBaseline: !prior,
   });
 
   const zip = buildZipStore([
@@ -68,6 +100,10 @@ export async function GET(
     { path: "picture-elements.yaml", content: pkg.pictureElementsYaml },
     { path: "assets/isometric.svg", content: pkg.isometricSvg },
     { path: "mappings.json", content: pkg.mappingsJson },
+    {
+      path: "export-diff.json",
+      content: JSON.stringify(exportDiff, null, 2),
+    },
     ...pkg.animationFiles.map((f) => ({
       path: f.path,
       content: f.content,

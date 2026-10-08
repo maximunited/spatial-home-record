@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   blobs,
@@ -8,6 +8,7 @@ import {
   evidence,
   evidenceLinks,
   haExportProfiles,
+  modelSnapshots,
   projects,
   relationships,
 } from "@/db/schema";
@@ -15,6 +16,7 @@ import type { ConfidenceState } from "@/lib/confidence";
 import { listDocumentsForEntity } from "@/lib/documents";
 import { filterEntitiesByQuery } from "@/lib/entity-tree";
 import type { HaMapping } from "@/lib/ha-export";
+import type { ModelSceneV1 } from "@/lib/model-snapshot";
 import { findCalibrationRoom } from "@/lib/plan-underlay";
 import type { RelationshipType } from "@/lib/relationships";
 
@@ -408,6 +410,99 @@ export async function listHaExportProfiles(projectId: string) {
     .select()
     .from(haExportProfiles)
     .where(eq(haExportProfiles.projectId, projectId));
+}
+
+export async function listModelSnapshots(projectId: string, limit = 20) {
+  const db = getDb();
+  return db
+    .select()
+    .from(modelSnapshots)
+    .where(eq(modelSnapshots.projectId, projectId))
+    .orderBy(desc(modelSnapshots.createdAt))
+    .limit(limit);
+}
+
+export async function getLatestModelSnapshot(projectId: string) {
+  const [row] = await listModelSnapshots(projectId, 1);
+  return row ?? null;
+}
+
+export async function getBaselineModelSnapshot(projectId: string) {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(modelSnapshots)
+    .where(
+      and(
+        eq(modelSnapshots.projectId, projectId),
+        eq(modelSnapshots.isBaseline, true),
+      ),
+    )
+    .orderBy(desc(modelSnapshots.createdAt))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function createModelSnapshot(input: {
+  projectId: string;
+  label?: string | null;
+  scene: ModelSceneV1;
+  isBaseline?: boolean;
+}) {
+  const db = getDb();
+  if (input.isBaseline) {
+    await db
+      .update(modelSnapshots)
+      .set({ isBaseline: false })
+      .where(eq(modelSnapshots.projectId, input.projectId));
+  }
+  const [row] = await db
+    .insert(modelSnapshots)
+    .values({
+      projectId: input.projectId,
+      label: input.label ?? null,
+      scene: input.scene,
+      isBaseline: Boolean(input.isBaseline),
+    })
+    .returning();
+  return row;
+}
+
+/** Prefer baseline for diffs when set; otherwise latest snapshot. */
+export async function getCompareModelSnapshot(projectId: string) {
+  const baseline = await getBaselineModelSnapshot(projectId);
+  if (baseline) return baseline;
+  return getLatestModelSnapshot(projectId);
+}
+
+export async function setModelSnapshotBaseline(
+  projectId: string,
+  snapshotId: string,
+) {
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(modelSnapshots)
+    .where(
+      and(
+        eq(modelSnapshots.id, snapshotId),
+        eq(modelSnapshots.projectId, projectId),
+      ),
+    )
+    .limit(1);
+  if (!existing) return null;
+
+  await db
+    .update(modelSnapshots)
+    .set({ isBaseline: false })
+    .where(eq(modelSnapshots.projectId, projectId));
+
+  const [row] = await db
+    .update(modelSnapshots)
+    .set({ isBaseline: true })
+    .where(eq(modelSnapshots.id, snapshotId))
+    .returning();
+  return row ?? null;
 }
 
 export async function searchEntities(projectId: string, query: string) {

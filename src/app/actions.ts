@@ -27,12 +27,17 @@ import {
   normalizePlanUnderlayTransform,
   planUnderlayAttributeKey,
 } from "@/lib/plan-underlay";
+import { buildModelScene } from "@/lib/model-snapshot";
 import {
   createEvidenceWithLinks,
+  createModelSnapshot,
   createProject,
   getCaptureTask,
   getEntityBundle,
+  listAttributesForEntities,
+  listEntitiesByProject,
   insertEntity,
+  setModelSnapshotBaseline,
   updateCaptureTaskStatus,
   updateEntitySpatialAnchor,
   updateHaExportProfile,
@@ -788,4 +793,43 @@ export async function unlockSharePasscodeAction(formData: FormData) {
   }
 
   redirect(`/share/${token}`);
+}
+
+/** Capture current scene as baseline for future HA re-export diffs. */
+export async function saveModelBaselineAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  if (!projectId) throw new Error("Missing projectId");
+
+  const entities = await listEntitiesByProject(projectId);
+  const attributes = await listAttributesForEntities(entities.map((e) => e.id));
+  const scene = buildModelScene(entities, attributes);
+
+  await createModelSnapshot({
+    projectId,
+    label: "baseline",
+    scene,
+    isBaseline: true,
+  });
+
+  revalidatePath(`/projects/${projectId}/export/ha`);
+  if (returnTo) revalidatePath(returnTo);
+}
+
+/** Mark an existing snapshot as the compare baseline. */
+export async function setModelBaselineAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const snapshotId = String(formData.get("snapshotId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  if (!projectId || !snapshotId) {
+    throw new Error("Missing projectId or snapshotId");
+  }
+
+  const updated = await setModelSnapshotBaseline(projectId, snapshotId);
+  if (!updated) throw new Error("Snapshot not found");
+
+  revalidatePath(`/projects/${projectId}/export/ha`);
+  if (returnTo) revalidatePath(returnTo);
 }

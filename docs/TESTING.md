@@ -4,7 +4,7 @@
 
 | Command | What it runs |
 | ------- | ------------ |
-| `npm run test:unit` | Domain + geometry + detail schemas + HA export (no database) |
+| `npm run test:unit` | Domain + geometry + detail schemas + HA export + completeness (no database) |
 | `npm run test:integration` | Neon/Postgres-backed project APIs (needs `DATABASE_URL`) |
 | `npm test` | All Vitest files |
 | `npm run typecheck` | `tsc --noEmit` |
@@ -27,6 +27,7 @@
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG/WebM packaging (mocked ffmpeg)
 - `tests/ha-sync.test.ts` — live HA config/env, state fetch (mocked), snapshot status, climate live captions
 - `tests/model-snapshot.test.ts` — scene snapshot build/diff, orphaned mappings, export-diff document
+- `tests/completeness.test.ts` — gap scan (missing/weak attrs, unmapped HA, rooms without evidence), priority ranking
 - `tests/share-redaction.test.ts` — layer defaults, payment redaction, share-safe evidence, passcode helpers
 - `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/model snapshots/documents/evidence/share links against real Postgres
 

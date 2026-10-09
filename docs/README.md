@@ -33,5 +33,6 @@ Shipped chunks for the living-room vertical slice:
 12. **OCR/CV evidence assist (MVP)** — pluggable heuristic text-hint pipeline; paste receipt/OCR text → document prefill + estimated attribute suggestions; no CV model download ([OCR-EVIDENCE.md](OCR-EVIDENCE.md))
 13. **Photoreal materials (MVP)** — kind/category PBR presets (paint, tile, glass, wood, metal), apartment env map, warm key/fill + hemisphere lighting, ACES tone mapping, contact shadows; warmer structural finish colors. Parametric boxes remain — not scanned meshes or texture atlases.
 14. **Live HA sync (read-only MVP)** — env `HA_BASE_URL` + `HA_ACCESS_TOKEN`; `GET /api/projects/:id/ha-sync` pulls `/api/states` for profile mappings; walkthrough sync panel + detail live card; climate badges show live captions when reachable; graceful `unconfigured` / `unreachable` ([HA-SYNC.md](HA-SYNC.md))
+15. **Completeness agent** — deterministic gap scan on project overview: missing/weak/conflicted attributes (vs detail schemas), unmapped HA exportables, rooms without evidence; ranked next-capture requests (`priority = gain × impact × success ÷ effort`)
 
-Still open vs full north star: full binary OCR / reconstruction, deeper redaction pipeline, completeness agent (later). Photoreal materials has a lean walkthrough MVP (item 13); fuller textured/scanned fidelity remains out of scope.
+Still open vs full north star: full binary OCR / reconstruction, deeper redaction pipeline. Photoreal materials has a lean walkthrough MVP (item 13); fuller textured/scanned fidelity remains out of scope.

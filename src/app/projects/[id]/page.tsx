@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CompletenessPanel } from "@/components/completeness-panel";
 import { ProjectNav } from "@/components/shell";
 import { ShareLinksPanel } from "@/components/share-links-panel";
+import { assessCompleteness } from "@/lib/completeness";
 import { buildEntityTree } from "@/lib/entity-tree";
+import type { HaMapping } from "@/lib/ha-export";
 import {
   findCalibrationRoom,
   isApartment54ProjectName,
@@ -12,9 +15,12 @@ import {
 } from "@/lib/plan-underlay";
 import {
   getProject,
+  listAttributesForEntities,
   listCaptureTasks,
   listEntitiesByProject,
   listEvidenceForEntity,
+  listEvidenceLinkedToEntities,
+  listHaExportProfiles,
 } from "@/lib/projects";
 import { listShareLinksForProject } from "@/lib/share-links";
 
@@ -37,6 +43,26 @@ export default async function ProjectPage({
   const tasks = await listCaptureTasks(id);
   const tree = buildEntityTree(entityRows);
   const shareLinks = await listShareLinksForProject(id);
+  const attributes = await listAttributesForEntities(
+    entityRows.map((e) => e.id),
+  );
+  const evidenceLinks = await listEvidenceLinkedToEntities(
+    id,
+    entityRows.map((e) => e.id),
+  );
+  const profiles = await listHaExportProfiles(id);
+  const haMappings = profiles.flatMap(
+    (p) => (p.mappings ?? []) as HaMapping[],
+  );
+  const completeness = assessCompleteness({
+    projectId: id,
+    entities: entityRows,
+    attributes,
+    evidenceLinks: evidenceLinks
+      .filter((e) => e.entityId)
+      .map((e) => ({ entityId: e.entityId as string })),
+    haMappings,
+  });
 
   let calibrateHref: string | null = null;
   let calibrateLabel = room ? `Open ${room.name}` : null;
@@ -85,10 +111,12 @@ export default async function ProjectPage({
             <div className="text-xs uppercase tracking-wide text-zinc-500">
               Completeness
             </div>
-            <div className="mt-1 text-sm text-zinc-600">
-              Placeholder — agent rules in pass 2
-            </div>
+            <CompletenessPanel report={completeness} compact />
           </div>
+        </div>
+
+        <div className="mt-8">
+          <CompletenessPanel report={completeness} />
         </div>
 
         <div className="mt-8">

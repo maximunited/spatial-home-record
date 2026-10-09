@@ -21,6 +21,7 @@
 - `tests/plan-underlay.test.ts` — underlay transform, primary plan pick, calibration room deep-link
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
+- `tests/ocr-evidence.test.ts` — OCR/CV evidence assist providers, text hints, attribute/document suggestions
 - `tests/detail-schemas.test.ts` — section matching and field parsing
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG/WebM packaging (mocked ffmpeg)
 - `tests/model-snapshot.test.ts` — scene snapshot build/diff, orphaned mappings, export-diff document

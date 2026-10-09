@@ -88,6 +88,7 @@ export function DetailPanel({
         documents={documents}
         projectDocuments={projectDocuments}
         returnTo={returnTo}
+        preferredAttributeKeys={[...schemaKeys]}
       />
 
       {entity.spatialAnchor ? (

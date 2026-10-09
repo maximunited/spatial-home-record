@@ -7,6 +7,7 @@
 | [BLOB-STORAGE.md](BLOB-STORAGE.md) | Private `.data/uploads` + auth-gated `/api/blobs` vs seed assets / future S3 |
 | [SHARE-LINKS.md](SHARE-LINKS.md) | Private share links, layer permissions, redaction |
 | [CURRENT-PHOTOS.md](CURRENT-PHOTOS.md) | IRL current-phase capture checklist for Apt 54 rooms |
+| [OCR-EVIDENCE.md](OCR-EVIDENCE.md) | OCR/CV evidence assist MVP (heuristic text hints + attribute suggestions) |
 | [IMPORT-APARTMENT-54.md](IMPORT-APARTMENT-54.md) | Pilot import from personal apartment folder (local only), including CAD→SVG underlay |
 | [TESTING.md](TESTING.md) | Unit vs integration tests and CI |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common setup failures |
@@ -28,5 +29,6 @@ Shipped chunks for the living-room vertical slice:
 9. **Climate / occupancy indicators** — temperature + occupancy fixtures in seed; walkthrough floating badges (attrs / HA hints, not live sync); HA export `state-badge` (climate) + `state-icon` (occupancy) with `include_climate_overlays`; detail forms for mount/mode/unit
 10. **Model-snapshot re-export diffs** — `model_snapshots` scene captures on HA download; `export-diff.json` + UI summary (added/removed/changed, orphaned mappings, unmapped exportables); baseline compare; profile HA mappings preserved across re-exports
 11. **Optional WebM packaging** — when `include_webm` (default on for custom-cards) and ffmpeg is on PATH, export ZIP includes `animations/blind.webm` + `fan.webm` and YAML `src` for desktop custom cards; PNG sequences remain primary; graceful skip if ffmpeg missing
+12. **OCR/CV evidence assist (MVP)** — pluggable heuristic text-hint pipeline; paste receipt/OCR text → document prefill + estimated attribute suggestions; no CV model download ([OCR-EVIDENCE.md](OCR-EVIDENCE.md))
 
-Still open vs full north star: OCR/CV, live HA sync, deeper redaction pipeline, photoreal materials, completeness agent (later).
+Still open vs full north star: full binary OCR / reconstruction, live HA sync, deeper redaction pipeline, photoreal materials, completeness agent (later).

@@ -12,6 +12,7 @@ import {
   type RoomScene,
   type WallPlanSegment,
 } from "@/lib/geometry";
+import { structuralFinishColor } from "@/lib/walkthrough-materials";
 
 export type Vec3 = [number, number, number];
 
@@ -292,7 +293,7 @@ export function buildStructuralMeshes(scene: RoomScene): WalkthroughMesh[] {
     position: planToThree(width / 2, depth / 2, 0.01),
     size: [width, 0.02, depth],
     rotationY: 0,
-    color: "#e7e5e4",
+    color: structuralFinishColor("floor"),
     opacity: 1,
     estimated: false,
   });
@@ -307,7 +308,7 @@ export function buildStructuralMeshes(scene: RoomScene): WalkthroughMesh[] {
     position: planToThree(width / 2, depth / 2, ceilingHeight),
     size: [width, 0.02, depth],
     rotationY: 0,
-    color: "#fafaf9",
+    color: structuralFinishColor("ceiling"),
     opacity: 0.35,
     estimated: false,
   });
@@ -325,7 +326,7 @@ export function buildStructuralMeshes(scene: RoomScene): WalkthroughMesh[] {
       position: planToThree(mid.x, mid.y, wall.height / 2),
       size: [len, wall.height, wall.thickness],
       rotationY: -wallAngleY(wall),
-      color: "#d6d3d1",
+      color: structuralFinishColor("wall"),
       opacity: 0.92,
       estimated: false,
     });

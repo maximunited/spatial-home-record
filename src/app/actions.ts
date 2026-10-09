@@ -14,6 +14,7 @@ import {
   isDocumentType,
   linkDocumentToEntities,
 } from "@/lib/documents";
+import type { AttributeSuggestion } from "@/lib/ocr-evidence";
 import {
   isPlanWallAnchor,
   scalePlanWallToLength,
@@ -625,6 +626,50 @@ export async function linkExistingDocumentAction(formData: FormData) {
     projectId,
     entityIds: [entityId],
   });
+
+  revalidateProjectPaths(projectId, entityId, returnTo);
+}
+
+/**
+ * Apply OCR/CV evidence assist attribute suggestions.
+ * Always stores confidence as estimated (never auto-confirms).
+ */
+export async function applyOcrAttributeSuggestionsAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const entityId = String(formData.get("entityId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  const raw = String(formData.get("suggestionsJson") ?? "");
+
+  if (!projectId || !entityId) throw new Error("Missing projectId or entityId");
+
+  const bundle = await getEntityBundle(entityId, { projectId });
+  if (!bundle) throw new Error("Entity not found in project");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Invalid suggestions JSON");
+  }
+  if (!Array.isArray(parsed)) throw new Error("Suggestions must be an array");
+
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") continue;
+    const s = item as Partial<AttributeSuggestion>;
+    if (s.target !== "attribute") continue;
+    if (typeof s.key !== "string" || !s.key.trim()) continue;
+    if (s.value === undefined || s.value === null) continue;
+
+    await upsertAttribute({
+      entityId,
+      key: s.key.trim(),
+      value: s.value,
+      units: typeof s.units === "string" ? s.units : null,
+      confidence: "estimated",
+      provenance: "ocr_evidence_assist",
+    });
+  }
 
   revalidateProjectPaths(projectId, entityId, returnTo);
 }

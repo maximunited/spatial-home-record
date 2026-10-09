@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import {
   attachDocumentAction,
   linkExistingDocumentAction,
 } from "@/app/actions";
+import { OcrEvidenceAssist } from "@/components/ocr-evidence-assist";
 import {
   DOCUMENT_TYPES,
   formatDocumentLabel,
@@ -14,6 +18,7 @@ export function DocumentsSection({
   documents,
   projectDocuments,
   returnTo,
+  preferredAttributeKeys = [],
 }: {
   projectId: string;
   entityId: string;
@@ -25,16 +30,15 @@ export function DocumentsSection({
     documentNumber: string | null;
   }>;
   returnTo: string;
+  preferredAttributeKeys?: string[];
 }) {
   const linkedIds = new Set(documents.map((d) => d.id));
   const linkable = projectDocuments.filter((d) => !linkedIds.has(d.id));
 
-  // Hide empty Documents list (requirement); attach form still available below
-  // when we always show the section for attach — task says "hide when empty"
-  // for listing in detail panel Documents section. Show section if docs exist
-  // OR always show attach controls. Spec: "Show documents in the detail panel
-  // Documents section (hide when empty)." — hide the list section when empty,
-  // but we still need attach UI. I'll show attach always; list only when nonempty.
+  const [merchant, setMerchant] = useState("");
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [currency, setCurrency] = useState("ILS");
+  const [total, setTotal] = useState("");
 
   return (
     <div className="space-y-3">
@@ -84,6 +88,19 @@ export function DocumentsSection({
         </section>
       ) : null}
 
+      <OcrEvidenceAssist
+        projectId={projectId}
+        entityId={entityId}
+        returnTo={returnTo}
+        preferredAttributeKeys={preferredAttributeKeys}
+        onPrefillDocument={(fields) => {
+          if (fields.merchant) setMerchant(fields.merchant);
+          if (fields.documentNumber) setDocumentNumber(fields.documentNumber);
+          if (fields.currency) setCurrency(fields.currency);
+          if (fields.total) setTotal(fields.total);
+        }}
+      />
+
       <section className="rounded border border-dashed border-zinc-300 bg-zinc-50 p-3">
         <h3 className="mb-2 text-sm font-medium text-zinc-800">
           Attach document
@@ -114,6 +131,8 @@ export function DocumentsSection({
             <span className="text-xs text-zinc-500">Merchant</span>
             <input
               name="merchant"
+              value={merchant}
+              onChange={(e) => setMerchant(e.target.value)}
               className="rounded border border-zinc-300 bg-white px-2 py-1"
             />
           </label>
@@ -121,6 +140,8 @@ export function DocumentsSection({
             <span className="text-xs text-zinc-500">Document number</span>
             <input
               name="documentNumber"
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
               className="rounded border border-zinc-300 bg-white px-2 py-1"
             />
           </label>
@@ -129,7 +150,8 @@ export function DocumentsSection({
               <span className="text-xs text-zinc-500">Currency</span>
               <input
                 name="currency"
-                defaultValue="ILS"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
                 className="rounded border border-zinc-300 bg-white px-2 py-1"
               />
             </label>
@@ -138,6 +160,8 @@ export function DocumentsSection({
               <input
                 name="total"
                 inputMode="decimal"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
                 className="rounded border border-zinc-300 bg-white px-2 py-1"
               />
             </label>

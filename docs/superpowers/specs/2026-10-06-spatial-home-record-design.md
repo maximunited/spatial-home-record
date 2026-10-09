@@ -130,6 +130,8 @@ Technical points use: `{ corner, u, height_affl, depth, side, width, height }` o
 
 One complete living-room scenario: calibrated room and media wall; 60×60 cm floor tiles with brand/grout/receipt/spare location; TV with product and HA entity; electrical and network points with wall-local coords; construction photo + avoid-drilling region; media cabinet inventory; smart-light overlays; blind and fan animations; temperature/occupancy indicators; isometric HA Picture Elements export with update-safe entity mappings.
 
-## Completeness agent (later)
+## Completeness agent
 
-Deterministic rules choose targets and apply geometry changes. LLM may phrase validated capture requests. Ranking: `priority = expected_information_gain × impact × success_probability ÷ user_effort`.
+Deterministic rules choose targets (MVP: surface gaps; geometry auto-edits later). Template-phrased capture requests; LLM phrasing optional later. Ranking: `priority = expected_information_gain × impact × success_probability ÷ user_effort`.
+
+MVP surfaces: missing/weak/conflicted attributes vs detail schemas, unmapped HA exportables, rooms without evidence — see project overview Completeness panel.

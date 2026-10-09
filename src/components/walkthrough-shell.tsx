@@ -2,7 +2,12 @@
 
 import dynamic from "next/dynamic";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { HaSyncPanel } from "@/components/ha-sync-panel";
+import {
+  applyLiveCaptionsToClimate,
+  type HaSyncSnapshot,
+} from "@/lib/ha-sync";
 import type { WalkthroughScene } from "@/lib/walkthrough-scene";
 
 const WalkthroughViewer = dynamic(
@@ -42,6 +47,7 @@ export function WalkthroughShell({
     () => searchParams.get("entity") ?? initialSelectedId,
     [searchParams, initialSelectedId],
   );
+  const [syncSnapshot, setSyncSnapshot] = useState<HaSyncSnapshot | null>(null);
 
   const onSelectEntity = useCallback(
     (entityId: string | null) => {
@@ -54,15 +60,38 @@ export function WalkthroughShell({
     [router, pathname, searchParams],
   );
 
+  const onSnapshot = useCallback((snapshot: HaSyncSnapshot) => {
+    setSyncSnapshot(snapshot);
+  }, []);
+
+  const liveScene = useMemo(() => {
+    if (!syncSnapshot || syncSnapshot.status !== "ok") return scene;
+    const captionByEntity = new Map(
+      applyLiveCaptionsToClimate(scene.climateIndicators, syncSnapshot).map(
+        (row) => [row.entityId, row.caption],
+      ),
+    );
+    return {
+      ...scene,
+      climateIndicators: scene.climateIndicators.map((ind) => ({
+        ...ind,
+        caption: captionByEntity.get(ind.entityId) ?? ind.caption,
+      })),
+    };
+  }, [scene, syncSnapshot]);
+
   return (
-    <WalkthroughViewer
-      projectId={projectId}
-      roomId={roomId}
-      scene={scene}
-      entities={entities}
-      selectedEntityId={selectedEntityId}
-      onSelectEntity={onSelectEntity}
-      planHref={planHref}
-    />
+    <div className="flex h-full min-h-[520px] flex-col gap-3">
+      <WalkthroughViewer
+        projectId={projectId}
+        roomId={roomId}
+        scene={liveScene}
+        entities={entities}
+        selectedEntityId={selectedEntityId}
+        onSelectEntity={onSelectEntity}
+        planHref={planHref}
+      />
+      <HaSyncPanel projectId={projectId} compact onSnapshot={onSnapshot} />
+    </div>
   );
 }

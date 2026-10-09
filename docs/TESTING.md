@@ -25,6 +25,7 @@
 - `tests/ocr-evidence.test.ts` — OCR/CV evidence assist providers, text hints, attribute/document suggestions
 - `tests/detail-schemas.test.ts` — section matching and field parsing
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG/WebM packaging (mocked ffmpeg)
+- `tests/ha-sync.test.ts` — live HA config/env, state fetch (mocked), snapshot status, climate live captions
 - `tests/model-snapshot.test.ts` — scene snapshot build/diff, orphaned mappings, export-diff document
 - `tests/share-redaction.test.ts` — layer defaults, payment redaction, share-safe evidence, passcode helpers
 - `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/model snapshots/documents/evidence/share links against real Postgres
@@ -54,6 +55,7 @@ npm run test:integration
 3. Open Floor Tiles / TV — confirm shared receipt under Documents; open Media Wall — construction vs current compare
 4. Open Socket / Media Cabinet — save detail fields with confidence
 5. HA Export — add a mapping, download ZIP, confirm `picture-elements.yaml` + `assets/isometric.svg` + `animations/blind_000.png` / `fan_000.png` + `export-diff.json` (+ WebM if ffmpeg present); re-export after a scene edit and check the diff panel
+6. Live HA sync — without `HA_*` env, walkthrough/export panels show `unconfigured`; with `HA_BASE_URL` + `HA_ACCESS_TOKEN` pointing at a real HA, Refresh shows mapped states and climate badges get `live ·` captions; stop HA / bad token → `unreachable` / `unauthorized` without breaking the page
 
 ## Manual smoke (Apartment 54 plan underlay)
 

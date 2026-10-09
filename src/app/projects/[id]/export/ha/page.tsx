@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { HaExportPanel } from "@/components/ha-export-panel";
+import { HaSyncPanel } from "@/components/ha-sync-panel";
 import { ReExportDiffPanel } from "@/components/re-export-diff-panel";
 import { ProjectNav } from "@/components/shell";
 import type { HaMapping } from "@/lib/ha-export";
@@ -54,7 +55,8 @@ export default async function HaExportPage({
           (YAML + isometric SVG + manifest). Home Assistant credentials are never
           stored here. Re-exports preserve mappings and record scene diffs.
         </p>
-        <div className="mt-6">
+        <div className="mt-6 space-y-6">
+          <HaSyncPanel projectId={id} />
           <ReExportDiffPanel
             projectId={id}
             diff={diff}

@@ -33,3 +33,13 @@ First query after idle can take several seconds. Integration tests use a 30s tim
 ## Clerk middleware
 
 If `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are both set, `/projects/*` requires auth. Clear those env vars for open local development.
+
+## Live HA sync shows `unconfigured`
+
+Set both `HA_BASE_URL` and `HA_ACCESS_TOKEN` in `.env`, then restart `npm run dev`. Tokens are never stored in the database — see [HA-SYNC.md](HA-SYNC.md).
+
+## Live HA sync shows `unreachable` / `unauthorized`
+
+- Confirm the HA host is reachable from the Next.js server (not only from the browser).
+- Use a long-lived access token with access to the mapped entities.
+- Check entity ids in HA Export mappings match real `domain.object_id` values.

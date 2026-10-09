@@ -58,8 +58,37 @@ export function HaSyncPanel({
   }, [projectId, onSnapshot]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/ha-sync`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(body?.error ?? `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as HaSyncSnapshot;
+        if (!cancelled) {
+          setSnapshot(data);
+          onSnapshot?.(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message =
+            err instanceof Error ? err.message : "Failed to load HA sync";
+          setFetchError(message);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, onSnapshot]);
 
   return (
     <section

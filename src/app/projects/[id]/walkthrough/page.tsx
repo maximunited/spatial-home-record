@@ -88,7 +88,7 @@ export default async function WalkthroughPage({
             />
             <p className="mt-4 text-xs text-zinc-500">
               Walkthrough is the navigation layer over structured entities —
-              not a photoreal export.
+              PBR finish presets on parametric volumes, not a scanned mesh.
             </p>
           </>
         }

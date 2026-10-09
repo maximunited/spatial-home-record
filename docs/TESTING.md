@@ -20,6 +20,7 @@
 - `tests/cad-rooms.test.ts` / `tests/cad-openings.test.ts` — per-room CAD split, hallway/balcony match, shared walls, openings
 - `tests/plan-underlay.test.ts` — underlay transform, primary plan pick, calibration room deep-link
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
+- `tests/walkthrough-materials.test.ts` — PBR presets by kind/category, structural finish colors, lighting constants
 - `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
 - `tests/detail-schemas.test.ts` — section matching and field parsing
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG/WebM packaging (mocked ffmpeg)

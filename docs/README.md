@@ -28,5 +28,6 @@ Shipped chunks for the living-room vertical slice:
 9. **Climate / occupancy indicators** — temperature + occupancy fixtures in seed; walkthrough floating badges (attrs / HA hints, not live sync); HA export `state-badge` (climate) + `state-icon` (occupancy) with `include_climate_overlays`; detail forms for mount/mode/unit
 10. **Model-snapshot re-export diffs** — `model_snapshots` scene captures on HA download; `export-diff.json` + UI summary (added/removed/changed, orphaned mappings, unmapped exportables); baseline compare; profile HA mappings preserved across re-exports
 11. **Optional WebM packaging** — when `include_webm` (default on for custom-cards) and ffmpeg is on PATH, export ZIP includes `animations/blind.webm` + `fan.webm` and YAML `src` for desktop custom cards; PNG sequences remain primary; graceful skip if ffmpeg missing
+12. **Photoreal materials (MVP)** — kind/category PBR presets (paint, tile, glass, wood, metal), apartment env map, warm key/fill + hemisphere lighting, ACES tone mapping, contact shadows; warmer structural finish colors. Parametric boxes remain — not scanned meshes or texture atlases.
 
-Still open vs full north star: OCR/CV, live HA sync, deeper redaction pipeline, photoreal materials, completeness agent (later).
+Still open vs full north star: OCR/CV, live HA sync, deeper redaction pipeline, completeness agent (later). Photoreal materials has a lean walkthrough MVP (item 12); fuller textured/scanned fidelity remains out of scope.

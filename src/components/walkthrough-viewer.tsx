@@ -3,18 +3,25 @@
 import Link from "next/link";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
 import {
+  ContactShadows,
+  Environment,
   Html,
   OrbitControls,
   PerspectiveCamera,
   PointerLockControls,
 } from "@react-three/drei";
 import { useCallback, useMemo, useState } from "react";
+import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import type {
   ClimateIndicator,
   PhotoHotspot,
   WalkthroughMesh,
   WalkthroughScene,
 } from "@/lib/walkthrough-scene";
+import {
+  materialPresetFor,
+  WALKTHROUGH_LIGHTING,
+} from "@/lib/walkthrough-materials";
 import { entityHref } from "@/lib/entity-href";
 
 type EntityRef = { id: string; type: string; name: string };
@@ -48,18 +55,25 @@ function SelectableBox({
     [mesh.entityId, onSelect],
   );
 
+  const preset = materialPresetFor(mesh.kind, mesh.category);
+
   return (
     <mesh
       position={mesh.position}
       rotation={[0, mesh.rotationY, 0]}
       onClick={handleClick}
       userData={{ entityId: mesh.entityId }}
+      castShadow={mesh.kind !== "ceiling" && mesh.kind !== "floor"}
+      receiveShadow={mesh.kind === "floor" || mesh.kind === "wall"}
     >
       <boxGeometry args={mesh.size} />
       <meshStandardMaterial
         color={selected ? "#2563eb" : mesh.color}
         transparent={mesh.opacity < 1 || selected}
         opacity={selected ? 0.95 : mesh.opacity}
+        roughness={preset.roughness}
+        metalness={preset.metalness}
+        envMapIntensity={preset.envMapIntensity}
         emissive={selected ? "#1d4ed8" : "#000000"}
         emissiveIntensity={selected ? 0.35 : 0}
         depthWrite={mesh.kind !== "ceiling" && mesh.kind !== "opening"}
@@ -155,12 +169,30 @@ function SceneContents({
 }) {
   const camPos = scene.defaultCamera.position;
   const camTarget = scene.defaultCamera.target;
+  const L = WALKTHROUGH_LIGHTING;
+  const planW = scene.room.plan.width;
+  const planD = scene.room.plan.depth;
 
   return (
     <>
-      <color attach="background" args={["#f4f4f5"]} />
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[4, 8, 2]} intensity={0.85} castShadow />
+      <color attach="background" args={[L.background]} />
+      <ambientLight intensity={L.ambientIntensity} />
+      <hemisphereLight
+        args={[L.hemisphereSky, L.hemisphereGround, L.hemisphereIntensity]}
+      />
+      <directionalLight
+        position={L.keyPosition}
+        intensity={L.keyIntensity}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+      />
+      <directionalLight position={L.fillPosition} intensity={L.fillIntensity} />
+      {/* Soft apartment IBL — finishes respond via envMapIntensity presets */}
+      <Environment
+        preset="apartment"
+        environmentIntensity={L.environmentIntensity}
+      />
       <PerspectiveCamera
         makeDefault
         position={camPos}
@@ -211,19 +243,19 @@ function SceneContents({
         ))}
       </group>
 
-      {/* Room axes hint */}
+      <ContactShadows
+        position={[planW / 2, 0.01, planD / 2]}
+        opacity={L.contactShadowOpacity}
+        scale={Math.max(planW, planD) + 2}
+        blur={L.contactShadowBlur}
+        far={6}
+        color="#3f3a36"
+      />
+
+      {/* Room axes hint — faint under finishes */}
       <gridHelper
-        args={[
-          Math.max(scene.room.plan.width, scene.room.plan.depth) + 1,
-          10,
-          "#a1a1aa",
-          "#e4e4e7",
-        ]}
-        position={[
-          scene.room.plan.width / 2,
-          0.001,
-          scene.room.plan.depth / 2,
-        ]}
+        args={[Math.max(planW, planD) + 1, 10, "#c4b8a8", "#e8e0d6"]}
+        position={[planW / 2, 0.002, planD / 2]}
       />
     </>
   );
@@ -350,8 +382,9 @@ export function WalkthroughViewer({
             Walkthrough · {scene.room.roomName}
           </h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Parametric volumes from plan geometry. Click a mesh to inspect;
-            estimated sizes are labeled — DB attributes stay authoritative.
+            Parametric volumes with PBR finish presets (paint, tile, glass,
+            metal). Click a mesh to inspect; estimated sizes are labeled — DB
+            attributes stay authoritative.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -391,9 +424,12 @@ export function WalkthroughViewer({
           <Canvas
             key={controlMode}
             dpr={[1, 2]}
-            gl={{ antialias: true }}
+            shadows
+            gl={{ antialias: true, toneMapping: ACESFilmicToneMapping }}
             onCreated={({ gl }) => {
-              gl.setClearColor("#f4f4f5");
+              gl.outputColorSpace = SRGBColorSpace;
+              gl.toneMappingExposure = 1.05;
+              gl.setClearColor(WALKTHROUGH_LIGHTING.background);
             }}
           >
             <SceneContents

@@ -116,8 +116,11 @@ describe("walkthrough-scene", () => {
     expect(structural.filter((m) => m.kind === "wall")).toHaveLength(4);
     expect(structural.filter((m) => m.kind === "opening")).toHaveLength(1);
     expect(structural.some((m) => m.kind === "floor")).toBe(true);
+    const floor = structural.find((m) => m.kind === "floor");
+    expect(floor?.color).toBe("#d9cfc3");
     const south = structural.find((m) => m.entityId === "wall-s");
     expect(south?.size[0]).toBeCloseTo(4.2, 1);
+    expect(south?.color).toBe("#ebe4da");
     expect(wallAngleY(roomScene.walls[0]!)).toBeCloseTo(0);
   });
 

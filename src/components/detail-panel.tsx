@@ -1,5 +1,6 @@
 import { DetailForms } from "@/components/detail-forms";
 import { DocumentsSection } from "@/components/documents-section";
+import { HaLiveStateCard } from "@/components/ha-live-state-card";
 import { sectionsForEntity } from "@/lib/detail-schemas";
 import type { ConfidenceState } from "@/lib/confidence";
 import type { getEntityBundle } from "@/lib/projects";
@@ -40,6 +41,8 @@ export function DetailPanel({
         </p>
         <p className="mt-1 font-mono text-xs text-zinc-400">{entity.id}</p>
       </section>
+
+      <HaLiveStateCard projectId={projectId} entityId={entity.id} />
 
       <DetailForms
         projectId={projectId}

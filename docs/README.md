@@ -4,6 +4,7 @@
 | --- | ------- |
 | [DATA-MODEL.md](DATA-MODEL.md) | Postgres entities, anchors, confidence, HA profiles |
 | [HA-EXPORT.md](HA-EXPORT.md) | Picture Elements ZIP, blind/fan animation frames, custom cards |
+| [HA-SYNC.md](HA-SYNC.md) | Live read-only HA entity state sync (env token, mapped entities) |
 | [BLOB-STORAGE.md](BLOB-STORAGE.md) | Private `.data/uploads` + auth-gated `/api/blobs` vs seed assets / future S3 |
 | [SHARE-LINKS.md](SHARE-LINKS.md) | Private share links, layer permissions, redaction |
 | [CURRENT-PHOTOS.md](CURRENT-PHOTOS.md) | IRL current-phase capture checklist for Apt 54 rooms |
@@ -25,8 +26,9 @@ Shipped chunks for the living-room vertical slice:
 6. **Wall photo compare** — construction vs current photos on `/projects/[id]/walls/[wallId]` (side-by-side or slider); evidence `metadata.phase`
 7. **Current-photo capture** — guided `capture_tasks` per Apt 54 room; complete on `/projects/[id]/capture` with IRL uploads tagged `phase: current` ([CURRENT-PHOTOS.md](CURRENT-PHOTOS.md))
 8. **Private share links** — tokenized `/share/[token]` with layer flags (walkthrough / dimensions / technical / inventory); documents & payments never included; optional passcode + expiry + revoke ([SHARE-LINKS.md](SHARE-LINKS.md))
-9. **Climate / occupancy indicators** — temperature + occupancy fixtures in seed; walkthrough floating badges (attrs / HA hints, not live sync); HA export `state-badge` (climate) + `state-icon` (occupancy) with `include_climate_overlays`; detail forms for mount/mode/unit
+9. **Climate / occupancy indicators** — temperature + occupancy fixtures in seed; walkthrough floating badges (attrs / HA hints; live captions when HA sync is ok); HA export `state-badge` (climate) + `state-icon` (occupancy) with `include_climate_overlays`; detail forms for mount/mode/unit
 10. **Model-snapshot re-export diffs** — `model_snapshots` scene captures on HA download; `export-diff.json` + UI summary (added/removed/changed, orphaned mappings, unmapped exportables); baseline compare; profile HA mappings preserved across re-exports
 11. **Optional WebM packaging** — when `include_webm` (default on for custom-cards) and ffmpeg is on PATH, export ZIP includes `animations/blind.webm` + `fan.webm` and YAML `src` for desktop custom cards; PNG sequences remain primary; graceful skip if ffmpeg missing
+12. **Live HA sync (read-only MVP)** — env `HA_BASE_URL` + `HA_ACCESS_TOKEN`; `GET /api/projects/:id/ha-sync` pulls `/api/states` for profile mappings; walkthrough sync panel + detail live card; climate badges show live captions when reachable; graceful `unconfigured` / `unreachable` ([HA-SYNC.md](HA-SYNC.md))
 
-Still open vs full north star: OCR/CV, live HA sync, deeper redaction pipeline, photoreal materials, completeness agent (later).
+Still open vs full north star: OCR/CV, deeper redaction pipeline, photoreal materials, completeness agent (later).

@@ -28,9 +28,7 @@ Revoke from the same panel — revoked tokens immediately 404.
 Apply the schema first if needed:
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f drizzle/0001_share_links.sql
-# or
-npx drizzle-kit push
+npm run db:migrate
 ```
 
 ## Public route

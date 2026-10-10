@@ -19,7 +19,7 @@ Source of truth is Postgres (Neon or local; CI uses Postgres 16). The app connec
 | `model_snapshots` | Versioned scene snapshots for HA re-export diffs (`scene` JSON, optional baseline) |
 | `share_links` | Private share tokens, optional passcode hash, expiry, layer flags |
 
-Schema lives in [`src/db/schema.ts`](../src/db/schema.ts). SQL migrations: [`drizzle/0000_init_spatial_schema.sql`](../drizzle/0000_init_spatial_schema.sql), [`drizzle/0001_share_links.sql`](../drizzle/0001_share_links.sql).
+Schema lives in [`src/db/schema.ts`](../src/db/schema.ts). Apply with `npm run db:migrate` (SQL: [`drizzle/0000_init_spatial_schema.sql`](../drizzle/0000_init_spatial_schema.sql), [`drizzle/0001_share_links.sql`](../drizzle/0001_share_links.sql); journal/meta under `drizzle/meta/`).
 
 ## Confidence
 

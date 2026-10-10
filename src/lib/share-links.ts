@@ -29,7 +29,10 @@ import {
   listEntitiesByProject,
   listEvidenceLinkedToEntities,
 } from "@/lib/projects";
-import { blobPublicUrl } from "@/lib/blobs";
+import { blobPublicUrl } from "@/lib/blob-urls";
+import { isShareLinkActive } from "@/lib/share-link-status";
+
+export { isShareLinkActive } from "@/lib/share-link-status";
 
 function isPrivateUploadStorageKey(storageKey: string): boolean {
   return storageKey.replace(/^\/+/, "").startsWith("uploads/");
@@ -79,15 +82,6 @@ export function shareUnlockCookieValue(token: string, passcodeHash: string): str
   return createHash("sha256")
     .update(`share-unlock:${token}:${passcodeHash}`)
     .digest("base64url");
-}
-
-export function isShareLinkActive(link: {
-  revokedAt: Date | null;
-  expiresAt: Date | null;
-}): boolean {
-  if (link.revokedAt) return false;
-  if (link.expiresAt && link.expiresAt.getTime() <= Date.now()) return false;
-  return true;
 }
 
 export async function createShareLink(input: {

@@ -37,7 +37,7 @@ Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so th
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
-1. **unit** — `lint`, `typecheck`, `test:unit`, `build`
+1. **unit** — `lint`, `typecheck`, `test:unit`, `build` (build uses `DATABASE_URL=""`; Client Components must not pull `postgres` — see [TROUBLESHOOTING.md](TROUBLESHOOTING.md))
 2. **integration** — Postgres 16 service, apply `drizzle/0000_init_spatial_schema.sql` + `drizzle/0001_share_links.sql`, `test:integration`
 
 ## Local integration setup

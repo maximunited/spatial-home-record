@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/db/client";
 import { blobs, documentLinks, documents, entities } from "@/db/schema";
 import { blobPublicUrl } from "@/lib/blob-urls";
@@ -102,11 +103,62 @@ export async function linkDocumentToEntities(input: {
   return inserted;
 }
 
+/**
+ * Attach (or clear) an owner-uploaded redacted file on a document.
+ * Share links may serve the redacted blob; originals stay private.
+ */
+export async function setDocumentRedactedBlob(input: {
+  documentId: string;
+  projectId: string;
+  redactedBlobId: string | null;
+}) {
+  const db = getDb();
+  const [doc] = await db
+    .select({ id: documents.id })
+    .from(documents)
+    .where(
+      and(
+        eq(documents.id, input.documentId),
+        eq(documents.projectId, input.projectId),
+      ),
+    )
+    .limit(1);
+  if (!doc) throw new Error("Document not found in project");
+
+  if (input.redactedBlobId) {
+    const [blob] = await db
+      .select({ id: blobs.id })
+      .from(blobs)
+      .where(
+        and(
+          eq(blobs.id, input.redactedBlobId),
+          eq(blobs.projectId, input.projectId),
+        ),
+      )
+      .limit(1);
+    if (!blob) throw new Error("Redacted blob not found in project");
+  }
+
+  const [updated] = await db
+    .update(documents)
+    .set({ redactedBlobId: input.redactedBlobId })
+    .where(
+      and(
+        eq(documents.id, input.documentId),
+        eq(documents.projectId, input.projectId),
+      ),
+    )
+    .returning();
+  return updated;
+}
+
 export async function listDocumentsForEntity(
   entityId: string,
   projectId: string,
 ): Promise<EntityDocument[]> {
   const db = getDb();
+  const originalBlobs = alias(blobs, "document_original_blobs");
+  const redactedBlobs = alias(blobs, "document_redacted_blobs");
   const rows = await db
     .select({
       id: documents.id,
@@ -119,12 +171,14 @@ export async function listDocumentsForEntity(
       total: documents.total,
       metadata: documents.metadata,
       createdAt: documents.createdAt,
-      storageKey: blobs.storageKey,
-      contentType: blobs.contentType,
+      storageKey: originalBlobs.storageKey,
+      contentType: originalBlobs.contentType,
+      redactedStorageKey: redactedBlobs.storageKey,
     })
     .from(documentLinks)
     .innerJoin(documents, eq(documents.id, documentLinks.documentId))
-    .leftJoin(blobs, eq(blobs.id, documents.originalBlobId))
+    .leftJoin(originalBlobs, eq(originalBlobs.id, documents.originalBlobId))
+    .leftJoin(redactedBlobs, eq(redactedBlobs.id, documents.redactedBlobId))
     .where(
       and(
         eq(documentLinks.entityId, entityId),
@@ -161,6 +215,10 @@ export async function listDocumentsForEntity(
     storageKey: r.storageKey,
     contentType: r.contentType,
     publicUrl: r.storageKey ? blobPublicUrl(r.storageKey) : null,
+    redactedStorageKey: r.redactedStorageKey,
+    redactedPublicUrl: r.redactedStorageKey
+      ? blobPublicUrl(r.redactedStorageKey)
+      : null,
     linkedEntityIds: linksByDoc.get(r.id) ?? [entityId],
   }));
 }

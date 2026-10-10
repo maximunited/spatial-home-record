@@ -24,6 +24,7 @@ import {
   createDocument,
   linkDocumentToEntities,
   listDocumentsForEntity,
+  setDocumentRedactedBlob,
 } from "@/lib/documents";
 import { pickPhasePhotos } from "@/lib/wall-photo-compare";
 import { buildRoomScene } from "@/lib/geometry";
@@ -36,6 +37,7 @@ import {
 import { getDb } from "@/db/client";
 import { evidence, evidenceLinks, haExportProfiles } from "@/db/schema";
 import {
+  canShareTokenAccessBlob,
   createShareLink,
   isShareLinkActive,
   listShareLinksForProject,
@@ -540,6 +542,98 @@ describe.runIf(hasDb)("projects integration", () => {
       });
       expect(revoked?.revokedAt).toBeTruthy();
       expect(await loadShareView(link.token)).toBeNull();
+    },
+    30_000,
+  );
+
+  it(
+    "attaches redacted document blobs and prefers them on share access",
+    async () => {
+      const project = await createProject({
+        name: `Redacted Blob ${Date.now()}`,
+      });
+      const room = await insertEntity({
+        projectId: project.id,
+        type: "room",
+        name: "Redact Room",
+      });
+
+      const originalBlob = await registerPublicBlob({
+        projectId: project.id,
+        storageKey: "seed/plan-original-for-redact.svg",
+        contentType: "image/svg+xml",
+      });
+      const redactedBlob = await registerPublicBlob({
+        projectId: project.id,
+        storageKey: "seed/plan-share-redacted.svg",
+        contentType: "image/svg+xml",
+      });
+
+      const doc = await createDocument({
+        projectId: project.id,
+        documentType: "other",
+        originalBlobId: originalBlob.id,
+        merchant: "Plan Scan",
+        linkEntityIds: [room.id],
+      });
+      await setDocumentRedactedBlob({
+        documentId: doc.id,
+        projectId: project.id,
+        redactedBlobId: redactedBlob.id,
+      });
+
+      const listed = await listDocumentsForEntity(room.id, project.id);
+      expect(listed[0]?.redactedStorageKey).toBe(
+        "seed/plan-share-redacted.svg",
+      );
+      expect(listed[0]?.redactedPublicUrl).toBe(
+        "/seed/plan-share-redacted.svg",
+      );
+
+      const db = getDb();
+      const [ev] = await db
+        .insert(evidence)
+        .values({
+          projectId: project.id,
+          type: "photo",
+          blobId: originalBlob.id,
+          summary: "Document-linked plan photo",
+          metadata: { document_id: doc.id, walkthrough: true },
+        })
+        .returning();
+      await db.insert(evidenceLinks).values([
+        { evidenceId: ev.id, entityId: room.id },
+      ]);
+
+      const link = await createShareLink({
+        projectId: project.id,
+        label: "Redacted guest",
+        layers: {
+          walkthrough: true,
+          dimensions: false,
+          technical: false,
+          inventorySummary: false,
+        },
+      });
+
+      const view = await loadShareView(link.token);
+      expect(view).not.toBeNull();
+      const shared = view?.view.evidence.find((e) => e.id === ev.id);
+      expect(shared?.storageKey).toBe("seed/plan-share-redacted.svg");
+      expect(shared?.publicUrl).toContain("plan-share-redacted");
+
+      expect(
+        await canShareTokenAccessBlob(
+          link.token,
+          "seed/plan-original-for-redact.svg",
+        ),
+      ).toBe(false);
+      expect(
+        await canShareTokenAccessBlob(
+          link.token,
+          "seed/plan-share-redacted.svg",
+        ),
+      ).toBe(true);
     },
     30_000,
   );

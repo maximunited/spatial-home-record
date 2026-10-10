@@ -31,6 +31,9 @@ export type EntityDocument = {
   storageKey: string | null;
   contentType: string | null;
   publicUrl: string | null;
+  /** Owner-uploaded share-safe copy (`documents.redacted_blob_id`). */
+  redactedStorageKey: string | null;
+  redactedPublicUrl: string | null;
   linkedEntityIds: string[];
 };
 

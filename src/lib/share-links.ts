@@ -4,7 +4,8 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
-import { and, asc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/db/client";
 import {
   DEFAULT_SHARE_LAYERS,
@@ -154,14 +155,66 @@ export async function getShareLinkByToken(token: string) {
   return row ?? null;
 }
 
+async function loadDocumentRedactionMaps(projectId: string): Promise<{
+  byOriginalBlobId: Map<string, string>;
+  byOriginalStorageKey: Map<string, string>;
+}> {
+  const db = getDb();
+  const originalBlobs = alias(blobs, "share_doc_original_blobs");
+  const redactedBlobs = alias(blobs, "share_doc_redacted_blobs");
+  const rows = await db
+    .select({
+      originalBlobId: documents.originalBlobId,
+      originalStorageKey: originalBlobs.storageKey,
+      redactedStorageKey: redactedBlobs.storageKey,
+    })
+    .from(documents)
+    .leftJoin(originalBlobs, eq(originalBlobs.id, documents.originalBlobId))
+    .innerJoin(redactedBlobs, eq(redactedBlobs.id, documents.redactedBlobId))
+    .where(eq(documents.projectId, projectId));
+
+  const byOriginalBlobId = new Map<string, string>();
+  const byOriginalStorageKey = new Map<string, string>();
+  for (const row of rows) {
+    if (!row.redactedStorageKey) continue;
+    if (row.originalBlobId) {
+      byOriginalBlobId.set(row.originalBlobId, row.redactedStorageKey);
+    }
+    if (row.originalStorageKey) {
+      byOriginalStorageKey.set(row.originalStorageKey, row.redactedStorageKey);
+    }
+  }
+  return { byOriginalBlobId, byOriginalStorageKey };
+}
+
+function resolveRedactedStorageKey(
+  maps: {
+    byOriginalBlobId: Map<string, string>;
+    byOriginalStorageKey: Map<string, string>;
+  },
+  blobId: string | null | undefined,
+  storageKey: string | null | undefined,
+): string | null {
+  if (blobId) {
+    const byId = maps.byOriginalBlobId.get(blobId);
+    if (byId) return byId;
+  }
+  if (storageKey) {
+    return maps.byOriginalStorageKey.get(storageKey) ?? null;
+  }
+  return null;
+}
+
 async function listShareEvidenceForProject(projectId: string) {
   const db = getDb();
+  const redactionMaps = await loadDocumentRedactionMaps(projectId);
   const rows = await db
     .select({
       id: evidence.id,
       type: evidence.type,
       summary: evidence.summary,
       metadata: evidence.metadata,
+      blobId: evidence.blobId,
       storageKey: blobs.storageKey,
       entityId: evidenceLinks.entityId,
     })
@@ -176,7 +229,11 @@ async function listShareEvidenceForProject(projectId: string) {
     summary: r.summary,
     metadata: r.metadata,
     storageKey: r.storageKey,
-    redactedStorageKey: null as string | null,
+    redactedStorageKey: resolveRedactedStorageKey(
+      redactionMaps,
+      r.blobId,
+      r.storageKey,
+    ),
     underlayStorageKey:
       r.metadata &&
       typeof r.metadata === "object" &&
@@ -209,6 +266,7 @@ export async function loadShareView(token: string) {
     link.projectId,
     entityRows.map((e) => e.id),
   );
+  const redactionMaps = await loadDocumentRedactionMaps(link.projectId);
   const byId = new Map(evidenceRows.map((e) => [e.id, e]));
   for (const l of linked) {
     if (!byId.has(l.id)) {
@@ -218,7 +276,11 @@ export async function loadShareView(token: string) {
         summary: l.summary,
         metadata: l.metadata,
         storageKey: l.storageKey,
-        redactedStorageKey: null,
+        redactedStorageKey: resolveRedactedStorageKey(
+          redactionMaps,
+          null,
+          l.storageKey,
+        ),
         underlayStorageKey:
           l.metadata &&
           typeof l.metadata === "object" &&
@@ -301,8 +363,9 @@ export function shareAssetUrl(
  * Allow a share token to read a private upload only when:
  * - the share link is active
  * - the blob belongs to that project
- * - the blob is not a document original/redacted file
- * - the blob is linked as share-safe evidence (plan / underlay / walkthrough photo)
+ * - the blob is not a document **original**
+ * - either the blob is an owner-uploaded document **redacted** file, or
+ *   it is linked as share-safe evidence (plan / underlay / walkthrough photo)
  */
 export async function canShareTokenAccessBlob(
   shareToken: string,
@@ -325,20 +388,29 @@ export async function canShareTokenAccessBlob(
     .limit(1);
   if (!blob) return false;
 
-  const [asDoc] = await db
+  const [asOriginal] = await db
     .select({ id: documents.id })
     .from(documents)
     .where(
       and(
         eq(documents.projectId, link.projectId),
-        or(
-          eq(documents.originalBlobId, blob.id),
-          eq(documents.redactedBlobId, blob.id),
-        ),
+        eq(documents.originalBlobId, blob.id),
       ),
     )
     .limit(1);
-  if (asDoc) return false;
+  if (asOriginal) return false;
+
+  const [asRedacted] = await db
+    .select({ id: documents.id })
+    .from(documents)
+    .where(
+      and(
+        eq(documents.projectId, link.projectId),
+        eq(documents.redactedBlobId, blob.id),
+      ),
+    )
+    .limit(1);
+  if (asRedacted) return true;
 
   const evidenceRows = await db
     .select({

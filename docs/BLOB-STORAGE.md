@@ -10,7 +10,7 @@ Uploads do **not** require AWS/S3 for the living-room / Apt 54 pilot.
 | User uploads | `.data/uploads/{projectId}/` (gitignored) | `uploads/{projectId}/...` | `/api/blobs/uploads/...` (auth-gated) |
 
 - Rows in `blobs` always hold the portable pointer (`storage_key`, optional `content_type`, `byte_size`, `checksum`).
-- Documents reference blobs via `documents.original_blob_id`; evidence photos via `evidence.blob_id`.
+- Documents reference blobs via `documents.original_blob_id` and optional `documents.redacted_blob_id` (manual redacted upload for share-safe access); evidence photos via `evidence.blob_id`.
 - Helpers: [`src/lib/blobs.ts`](../src/lib/blobs.ts) (`writeLocalBlob`, `registerPublicBlob`, `blobPublicUrl`).
 - Serve route: [`src/app/api/blobs/[...path]/route.ts`](../src/app/api/blobs/[...path]/route.ts).
 - Auth gate: [`src/lib/upload-auth.ts`](../src/lib/upload-auth.ts).

@@ -10,13 +10,14 @@ Copy `.env.example` → `.env` and set a Postgres URL. Without it:
 
 ## `Can't resolve 'tls'` / `perf_hooks` during `npm run build`
 
-`postgres` is Node-only. Client Components must not import `@/db/client`, `@/lib/documents`, `@/lib/blobs`, `@/lib/projects`, or `@/lib/share-links`.
+`postgres` is Node-only. Client Components must not import `@/db/client`, `@/lib/documents`, `@/lib/measurements`, `@/lib/blobs`, `@/lib/projects`, or `@/lib/share-links`.
 
 Use the client-safe modules instead:
 
 | Need | Import from |
 | ---- | ----------- |
 | Document types / labels | `@/lib/document-types` |
+| Measurement units / labels | `@/lib/measurement-types` |
 | Blob public URLs / key helpers | `@/lib/blob-urls` |
 | Share link active check | `@/lib/share-link-status` |
 

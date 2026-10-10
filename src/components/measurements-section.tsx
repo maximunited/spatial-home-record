@@ -9,7 +9,7 @@ import {
   MEASUREMENT_UNITS,
   formatMeasurementLabel,
   type EntityMeasurement,
-} from "@/lib/measurements";
+} from "@/lib/measurement-types";
 
 export function MeasurementsSection({
   projectId,

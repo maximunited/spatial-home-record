@@ -1,6 +1,7 @@
 import { DetailForms } from "@/components/detail-forms";
 import { DocumentsSection } from "@/components/documents-section";
 import { HaLiveStateCard } from "@/components/ha-live-state-card";
+import { MeasurementsSection } from "@/components/measurements-section";
 import { sectionsForEntity } from "@/lib/detail-schemas";
 import type { ConfidenceState } from "@/lib/confidence";
 import type { getEntityBundle } from "@/lib/projects";
@@ -23,7 +24,8 @@ export function DetailPanel({
     documentNumber: string | null;
   }>;
 }) {
-  const { entity, attributes, relationships, documents } = bundle;
+  const { entity, attributes, relationships, documents, measurements } =
+    bundle;
   const schemaSections = sectionsForEntity(entity);
   const schemaKeys = new Set(
     schemaSections.flatMap((s) => s.fields.map((f) => f.key)),
@@ -92,6 +94,13 @@ export function DetailPanel({
         projectDocuments={projectDocuments}
         returnTo={returnTo}
         preferredAttributeKeys={[...schemaKeys]}
+      />
+
+      <MeasurementsSection
+        projectId={projectId}
+        entityId={entity.id}
+        measurements={measurements}
+        returnTo={returnTo}
       />
 
       {entity.spatialAnchor ? (

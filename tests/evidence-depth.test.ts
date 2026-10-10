@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { formatDocumentLabel, isDocumentType } from "@/lib/document-types";
 import {
+  formatMeasurementLabel,
+  isMeasurementUnit,
+  parseMeasurementValue,
+} from "@/lib/measurements";
+import {
   canShowPhotoCompare,
   evidencePhase,
   pickPhasePhotos,
@@ -22,6 +27,34 @@ describe("documents helpers", () => {
         documentNumber: "INV-1",
       }),
     ).toBe("receipt · Example Home Store · INV-1");
+  });
+});
+
+describe("measurements helpers", () => {
+  it("validates units", () => {
+    expect(isMeasurementUnit("m")).toBe(true);
+    expect(isMeasurementUnit("cm")).toBe(true);
+    expect(isMeasurementUnit("yards")).toBe(false);
+  });
+
+  it("parses finite values", () => {
+    expect(parseMeasurementValue("4.2")).toBe("4.2");
+    expect(parseMeasurementValue(" 0 ")).toBe("0");
+    expect(() => parseMeasurementValue("")).toThrow(/required/i);
+    expect(() => parseMeasurementValue("nope")).toThrow(/finite/i);
+  });
+
+  it("formats labels", () => {
+    expect(
+      formatMeasurementLabel({
+        label: "Wall length",
+        value: "4.2",
+        units: "m",
+      }),
+    ).toBe("Wall length · 4.2 m");
+    expect(
+      formatMeasurementLabel({ label: null, value: "90", units: "cm" }),
+    ).toBe("90 cm");
   });
 });
 

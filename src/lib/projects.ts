@@ -15,6 +15,7 @@ import {
 import type { ConfidenceState } from "@/lib/confidence";
 import { listDocumentsForEntity } from "@/lib/documents";
 import { filterEntitiesByQuery } from "@/lib/entity-tree";
+import { listMeasurementsForEntity } from "@/lib/measurements";
 import type { HaMapping } from "@/lib/ha-export";
 import type { ModelSceneV1 } from "@/lib/model-snapshot";
 import { findCalibrationRoom } from "@/lib/plan-underlay";
@@ -93,12 +94,17 @@ export async function getEntityBundle(
     .where(eq(relationships.toEntityId, entityId));
 
   const docs = await listDocumentsForEntity(entityId, entity.projectId);
+  const measurementRows = await listMeasurementsForEntity(
+    entityId,
+    entity.projectId,
+  );
 
   return {
     entity,
     attributes: attrs,
     relationships: [...relsFrom, ...relsTo],
     documents: docs,
+    measurements: measurementRows,
   };
 }
 

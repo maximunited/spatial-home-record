@@ -91,6 +91,12 @@ Rich editable forms (empty generic sections stay hidden; schema-matched sections
 - Wall workspace compare uses photo evidence with `metadata.phase` of `construction` or `current`
 - Seed Living Room Pilot: one receipt linked to TV + floor tiles; media wall has construction + current SVG evidence under `public/seed/`
 
+## Measurements (pass 2)
+
+- Rows in `measurements`: `project_id`, optional `entity_id`, `label`, `value`, `units` (`m|cm|mm|ft|in`), per-row `confidence`, optional `endpoint_a` / `endpoint_b` JSON
+- Detail panel: list + inline edit when present; “Add measurement” form always available ([`src/lib/measurements.ts`](../src/lib/measurements.ts), [`MeasurementsSection`](../src/components/measurements-section.tsx))
+- Endpoints are stored in schema for later drawing UX; lean UI does not edit them yet
+
 ## HA export profiles
 
 `ha_export_profiles.mappings` is an array of `{ entityId, haEntityId, actions?, label? }`. Camera is fixed isometric for v0. Package generation: [`src/lib/ha-export.ts`](../src/lib/ha-export.ts) → ZIP with:

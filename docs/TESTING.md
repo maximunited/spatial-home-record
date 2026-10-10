@@ -21,7 +21,7 @@
 - `tests/plan-underlay.test.ts` — underlay transform, primary plan pick, calibration room deep-link
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/walkthrough-materials.test.ts` — PBR presets by kind/category, structural finish colors, lighting constants
-- `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
+- `tests/evidence-depth.test.ts` — blob URLs, document types, measurement helpers, wall photo phase pairing
 - `tests/ocr-evidence.test.ts` — OCR/CV evidence assist providers, text hints, attribute/document suggestions
 - `tests/detail-schemas.test.ts` — section matching and field parsing
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG/WebM packaging (mocked ffmpeg)
@@ -29,7 +29,7 @@
 - `tests/model-snapshot.test.ts` — scene snapshot build/diff, orphaned mappings, export-diff document
 - `tests/completeness.test.ts` — gap scan (missing/weak attrs, unmapped HA, rooms without evidence), priority ranking
 - `tests/share-redaction.test.ts` — layer defaults, payment redaction, share-safe evidence, passcode helpers
-- `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/model snapshots/documents/evidence/share links against real Postgres
+- `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/model snapshots/documents/measurements/evidence/share links against real Postgres
 
 Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so they no-op locally when the DB is unset.
 

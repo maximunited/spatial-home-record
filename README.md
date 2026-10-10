@@ -4,10 +4,10 @@
 
 Evidence-backed spatial home record: structured apartment entities with per-attribute confidence, calibrated plan geometry, rich detail forms, and Home Assistant Picture Elements export.
 
-## Status (pass 2)
+## Status (pass 2 shipped)
 
 - Design: [`docs/superpowers/specs/2026-10-06-spatial-home-record-design.md`](docs/superpowers/specs/2026-10-06-spatial-home-record-design.md)
-- Docs index: [`docs/README.md`](docs/README.md)
+- Docs index: [`docs/README.md`](docs/README.md) (chunks 1–15)
 - Geometry editor on room/wall hubs (walls, openings, ceiling height; plan-evidence underlay for calibration)
 - Detail forms for floor tiles, TV, wall tech points, cabinet inventory
 - HA export v0: fixed isometric SVG → downloadable Picture Elements package
@@ -18,6 +18,11 @@ Evidence-backed spatial home record: structured apartment entities with per-attr
 - **Private share links** — `/share/[token]` with layer permissions; documents/payments never included ([docs/SHARE-LINKS.md](docs/SHARE-LINKS.md))
 - **Climate / occupancy** — walkthrough badges + HA Picture Elements climate badges / occupancy icons (seed Living Room)
 - **Model-snapshot re-export diffs** — HA download snapshots scene, ships `export-diff.json`, preserves profile mappings ([docs/HA-EXPORT.md](docs/HA-EXPORT.md))
+- **OCR/CV evidence assist (MVP)** — heuristic text hints → document prefill + estimated attribute suggestions ([docs/OCR-EVIDENCE.md](docs/OCR-EVIDENCE.md))
+- **Photoreal materials (MVP)** — kind/category PBR presets, env map, warm lighting; parametric boxes (not scanned meshes)
+- **Live HA sync (read-only MVP)** — env token; walkthrough sync panel + detail live card ([docs/HA-SYNC.md](docs/HA-SYNC.md))
+- **Completeness agent** — deterministic gap scan + ranked next-capture requests on project overview
+- Still open vs north star: real binary OCR, deeper redaction, scene reconstruction, scanned/photoreal mesh fidelity
 - CI: unit + Postgres integration
 
 ## Setup

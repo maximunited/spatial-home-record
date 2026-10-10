@@ -14,6 +14,11 @@ import {
   isDocumentType,
   linkDocumentToEntities,
 } from "@/lib/documents";
+import {
+  createMeasurement,
+  isMeasurementUnit,
+  updateMeasurement,
+} from "@/lib/measurements";
 import type { AttributeSuggestion } from "@/lib/ocr-evidence";
 import {
   isPlanWallAnchor,
@@ -625,6 +630,74 @@ export async function linkExistingDocumentAction(formData: FormData) {
     documentId,
     projectId,
     entityIds: [entityId],
+  });
+
+  revalidateProjectPaths(projectId, entityId, returnTo);
+}
+
+export async function createMeasurementAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const entityId = String(formData.get("entityId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  const label = String(formData.get("label") ?? "").trim() || null;
+  const valueRaw = String(formData.get("value") ?? "");
+  const unitsRaw = String(formData.get("units") ?? "m").trim() || "m";
+  const confidence = assertConfidenceState(
+    String(formData.get("confidence") ?? "supported"),
+  );
+
+  if (!projectId || !entityId) throw new Error("Missing projectId or entityId");
+  if (!isMeasurementUnit(unitsRaw)) {
+    throw new Error("Invalid measurement units");
+  }
+
+  const bundle = await getEntityBundle(entityId, { projectId });
+  if (!bundle) throw new Error("Entity not found in project");
+
+  await createMeasurement({
+    projectId,
+    entityId,
+    label,
+    value: valueRaw,
+    units: unitsRaw,
+    confidence,
+  });
+
+  revalidateProjectPaths(projectId, entityId, returnTo);
+}
+
+export async function updateMeasurementAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const entityId = String(formData.get("entityId") ?? "");
+  const measurementId = String(formData.get("measurementId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  const label = String(formData.get("label") ?? "").trim() || null;
+  const valueRaw = String(formData.get("value") ?? "");
+  const unitsRaw = String(formData.get("units") ?? "m").trim() || "m";
+  const confidence = assertConfidenceState(
+    String(formData.get("confidence") ?? "supported"),
+  );
+
+  if (!projectId || !entityId || !measurementId) {
+    throw new Error("Missing projectId, entityId, or measurementId");
+  }
+  if (!isMeasurementUnit(unitsRaw)) {
+    throw new Error("Invalid measurement units");
+  }
+
+  const bundle = await getEntityBundle(entityId, { projectId });
+  if (!bundle) throw new Error("Entity not found in project");
+
+  await updateMeasurement({
+    id: measurementId,
+    projectId,
+    entityId,
+    label,
+    value: valueRaw,
+    units: unitsRaw,
+    confidence,
   });
 
   revalidateProjectPaths(projectId, entityId, returnTo);

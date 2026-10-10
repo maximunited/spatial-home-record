@@ -25,6 +25,11 @@ import {
   linkDocumentToEntities,
   listDocumentsForEntity,
 } from "@/lib/documents";
+import {
+  createMeasurement,
+  listMeasurementsForEntity,
+  updateMeasurement,
+} from "@/lib/measurements";
 import { pickPhasePhotos } from "@/lib/wall-photo-compare";
 import { buildRoomScene } from "@/lib/geometry";
 import { buildHaExportPackage } from "@/lib/ha-export";
@@ -366,6 +371,79 @@ describe.runIf(hasDb)("projects integration", () => {
       expect(promoted?.isBaseline).toBe(true);
       const compareAfter = await getCompareModelSnapshot(project.id);
       expect(compareAfter?.id).toBe(snap2.id);
+    },
+    30_000,
+  );
+
+  it(
+    "creates lists and updates entity measurements",
+    async () => {
+      const project = await createProject({
+        name: `Measurements ${Date.now()}`,
+      });
+      const wall = await insertEntity({
+        projectId: project.id,
+        type: "wall",
+        name: "North Wall",
+      });
+      const other = await insertEntity({
+        projectId: project.id,
+        type: "wall",
+        name: "South Wall",
+      });
+
+      const created = await createMeasurement({
+        projectId: project.id,
+        entityId: wall.id,
+        label: "Length",
+        value: "4.2",
+        units: "m",
+        confidence: "estimated",
+      });
+      expect(created.entityId).toBe(wall.id);
+      expect(Number(created.value)).toBe(4.2);
+
+      const listed = await listMeasurementsForEntity(wall.id, project.id);
+      expect(listed).toHaveLength(1);
+      expect(listed[0]?.label).toBe("Length");
+      expect(listed[0]?.confidence).toBe("estimated");
+
+      const emptyOther = await listMeasurementsForEntity(other.id, project.id);
+      expect(emptyOther).toHaveLength(0);
+
+      const updated = await updateMeasurement({
+        id: created.id,
+        projectId: project.id,
+        label: "Clear length",
+        value: "4.25",
+        units: "m",
+        confidence: "confirmed",
+      });
+      expect(updated.label).toBe("Clear length");
+      expect(Number(updated.value)).toBe(4.25);
+      expect(updated.confidence).toBe("confirmed");
+
+      const bundle = await getEntityBundle(wall.id, { projectId: project.id });
+      expect(bundle?.measurements).toHaveLength(1);
+      expect(bundle?.measurements[0]?.label).toBe("Clear length");
+
+      await expect(
+        createMeasurement({
+          projectId: project.id,
+          entityId: wall.id,
+          value: "not-a-number",
+          units: "m",
+        }),
+      ).rejects.toThrow(/finite/i);
+
+      await expect(
+        createMeasurement({
+          projectId: project.id,
+          entityId: wall.id,
+          value: "1",
+          units: "yards",
+        }),
+      ).rejects.toThrow(/units/i);
     },
     30_000,
   );

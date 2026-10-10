@@ -21,7 +21,7 @@
 - `tests/plan-underlay.test.ts` — underlay transform, primary plan pick, calibration room deep-link
 - `tests/walkthrough-scene.test.ts` — geometry→mesh helpers, hotspots, estimated sizes
 - `tests/walkthrough-materials.test.ts` — PBR presets by kind/category, structural finish colors, lighting constants
-- `tests/evidence-depth.test.ts` — blob URLs, document types, wall photo phase pairing
+- `tests/evidence-depth.test.ts` — blob URLs, document types, measurement helpers, wall photo phase pairing
 - `tests/ocr-evidence.test.ts` — OCR/CV evidence assist providers, text hints, attribute/document suggestions
 - `tests/detail-schemas.test.ts` — section matching and field parsing
 - `tests/ha-export.test.ts` — Picture Elements YAML, SVG, ZIP package, animation PNG/WebM packaging (mocked ffmpeg)
@@ -29,7 +29,7 @@
 - `tests/model-snapshot.test.ts` — scene snapshot build/diff, orphaned mappings, export-diff document
 - `tests/completeness.test.ts` — gap scan (missing/weak attrs, unmapped HA, rooms without evidence), priority ranking
 - `tests/share-redaction.test.ts` — layer defaults, payment redaction, share-safe evidence, passcode helpers
-- `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/model snapshots/documents/evidence/share links against real Postgres
+- `tests/projects.integration.test.ts` — create/scope/upsert/search/geometry/HA/model snapshots/documents/measurements/evidence/share links against real Postgres
 
 Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so they no-op locally when the DB is unset.
 
@@ -38,14 +38,14 @@ Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so th
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
 1. **unit** — `lint`, `typecheck`, `test:unit`, `build`
-2. **integration** — Postgres 16 service, apply `drizzle/0000_init_spatial_schema.sql` + `drizzle/0001_share_links.sql`, `test:integration`
+2. **integration** — Postgres 16 service, `npm run db:migrate`, `test:integration`
 
 ## Local integration setup
 
 ```bash
 cp .env.example .env
 # set DATABASE_URL
-npx drizzle-kit push
+npm run db:migrate
 npm run test:integration
 ```
 

@@ -19,7 +19,7 @@ Source of truth is Postgres (Neon or local; CI uses Postgres 16). The app connec
 | `model_snapshots` | Versioned scene snapshots for HA re-export diffs (`scene` JSON, optional baseline) |
 | `share_links` | Private share tokens, optional passcode hash, expiry, layer flags |
 
-Schema lives in [`src/db/schema.ts`](../src/db/schema.ts). SQL migrations: [`drizzle/0000_init_spatial_schema.sql`](../drizzle/0000_init_spatial_schema.sql), [`drizzle/0001_share_links.sql`](../drizzle/0001_share_links.sql).
+Schema lives in [`src/db/schema.ts`](../src/db/schema.ts). Apply with `npm run db:migrate` (SQL: [`drizzle/0000_init_spatial_schema.sql`](../drizzle/0000_init_spatial_schema.sql), [`drizzle/0001_share_links.sql`](../drizzle/0001_share_links.sql); journal/meta under `drizzle/meta/`).
 
 ## Confidence
 
@@ -89,6 +89,12 @@ Rich editable forms (empty generic sections stay hidden; schema-matched sections
 - Detail panel lists documents linked to the entity (section hidden when empty); attach form + link-existing always available
 - Wall workspace compare uses photo evidence with `metadata.phase` of `construction` or `current`
 - Seed Living Room Pilot: one receipt linked to TV + floor tiles; media wall has construction + current SVG evidence under `public/seed/`
+
+## Measurements (pass 2)
+
+- Rows in `measurements`: `project_id`, optional `entity_id`, `label`, `value`, `units` (`m|cm|mm|ft|in`), per-row `confidence`, optional `endpoint_a` / `endpoint_b` JSON
+- Detail panel: list + inline edit when present; “Add measurement” form always available ([`src/lib/measurements.ts`](../src/lib/measurements.ts), [`MeasurementsSection`](../src/components/measurements-section.tsx))
+- Endpoints are stored in schema for later drawing UX; lean UI does not edit them yet
 
 ## HA export profiles
 

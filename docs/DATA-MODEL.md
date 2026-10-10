@@ -87,6 +87,7 @@ Rich editable forms (empty generic sections stay hidden; schema-matched sections
 
 - Document types: `receipt | warranty | manual | invoice | other`
 - Detail panel lists documents linked to the entity (section hidden when empty); attach form + link-existing always available
+- Optional `redacted_blob_id`: owner-uploaded redacted file; share links may serve it (originals stay private)
 - Wall workspace compare uses photo evidence with `metadata.phase` of `construction` or `current`
 - Seed Living Room Pilot: one receipt linked to TV + floor tiles; media wall has construction + current SVG evidence under `public/seed/`
 

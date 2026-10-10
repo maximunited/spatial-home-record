@@ -166,8 +166,42 @@ describe("share-safe evidence", () => {
     expect(
       pickShareSafeAssetUrl({
         storageKey: "seed/receipt.svg",
+        redactedStorageKey: "seed/plan-redacted.svg",
+      }),
+    ).toBe("/seed/plan-redacted.svg");
+    expect(
+      pickShareSafeAssetUrl({
+        storageKey: "seed/receipt.svg",
       }),
     ).toBeNull();
+  });
+
+  it("treats owner-uploaded redacted keys as share-safe", () => {
+    expect(
+      isShareSafeEvidence({
+        type: "photo",
+        metadata: { document_id: "doc-1", contains_payment: true },
+        storageKey: "uploads/p/documents/receipt.jpg",
+        redactedStorageKey: "uploads/p/plan-redacted.jpg",
+      }),
+    ).toBe(true);
+    expect(
+      filterShareSafeWalkthroughEvidence([
+        {
+          id: "with-redacted",
+          type: "photo",
+          metadata: { document_id: "doc-1" },
+          storageKey: "uploads/p/documents/scan.jpg",
+          redactedStorageKey: "uploads/p/scan-redacted.jpg",
+        },
+        {
+          id: "doc-only",
+          type: "photo",
+          metadata: { document_id: "doc-2" },
+          storageKey: "uploads/p/documents/scan2.jpg",
+        },
+      ]).map((r) => r.id),
+    ).toEqual(["with-redacted"]);
   });
 });
 
@@ -251,6 +285,45 @@ describe("buildShareViewModel", () => {
       true,
     );
     expect(() => assertSharePayloadSafe(view)).not.toThrow();
+  });
+
+  it("prefers redacted storage keys in walkthrough evidence", () => {
+    const view = buildShareViewModel({
+      projectName: "Redacted Pref",
+      layers: {
+        walkthrough: true,
+        dimensions: false,
+        technical: false,
+        inventorySummary: false,
+      },
+      entities: [
+        {
+          id: "r1",
+          type: "room",
+          category: null,
+          name: "Living",
+          parentId: null,
+        },
+      ],
+      attributes: [],
+      evidence: [
+        {
+          id: "e-redacted",
+          type: "photo",
+          summary: "Doc-linked scan",
+          metadata: { document_id: "doc-1" },
+          storageKey: "uploads/p/documents/scan.jpg",
+          redactedStorageKey: "uploads/p/scan-redacted.jpg",
+          entityId: "r1",
+        },
+      ],
+    });
+
+    expect(view.evidence).toHaveLength(1);
+    expect(view.evidence[0]?.storageKey).toBe("uploads/p/scan-redacted.jpg");
+    expect(view.evidence[0]?.publicUrl).toBe(
+      "/api/blobs/uploads/p/scan-redacted.jpg",
+    );
   });
 
   it("assertSharePayloadSafe rejects leaked receipts", () => {

@@ -4,7 +4,7 @@ Lean, pluggable pipeline that extracts **text hints** from document evidence con
 
 ## Status
 
-Shipped as pass-2 leftover MVP. Still **not** full OCR, scene reconstruction, or a completeness agent.
+Shipped as Pass 2 MVP (item 12). Completeness gap scan is a separate shipped feature (item 15). Still **not** full binary OCR or scene reconstruction.
 
 ## What it does
 
@@ -21,7 +21,7 @@ Shipped as pass-2 leftover MVP. Still **not** full OCR, scene reconstruction, or
 - Photogrammetry / plan auto-trace / wall detection
 - Live camera capture or continuous CV
 - Auto-writing `confirmed` attributes
-- Completeness-agent capture ranking
+- Completeness-agent capture ranking (shipped separately; see Pass 2 item 15 in [README.md](README.md))
 
 ## Usage
 

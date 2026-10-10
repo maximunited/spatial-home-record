@@ -15,9 +15,9 @@
 | [superpowers/specs/2026-10-06-spatial-home-record-design.md](superpowers/specs/2026-10-06-spatial-home-record-design.md) | Product design |
 | [superpowers/plans/2026-10-06-spatial-home-record-pass-1.md](superpowers/plans/2026-10-06-spatial-home-record-pass-1.md) | Pass 1 implementation plan |
 
-## Pass 2 (in progress)
+## Pass 2 (shipped)
 
-Shipped chunks for the living-room vertical slice:
+Living-room vertical slice — chunks 1–15:
 
 1. **Geometry editor** — calibrated plan; plan-evidence underlay (opacity/scale/offset); persist walls/openings/heights + `plan_underlay`
 2. **Detail depth** — floor/TV/wall-tech/cabinet forms with per-attribute confidence
@@ -35,4 +35,4 @@ Shipped chunks for the living-room vertical slice:
 14. **Live HA sync (read-only MVP)** — env `HA_BASE_URL` + `HA_ACCESS_TOKEN`; `GET /api/projects/:id/ha-sync` pulls `/api/states` for profile mappings; walkthrough sync panel + detail live card; climate badges show live captions when reachable; graceful `unconfigured` / `unreachable` ([HA-SYNC.md](HA-SYNC.md))
 15. **Completeness agent** — deterministic gap scan on project overview: missing/weak/conflicted attributes (vs detail schemas), unmapped HA exportables, rooms without evidence; ranked next-capture requests (`priority = gain × impact × success ÷ effort`)
 
-Still open vs full north star: full binary OCR / reconstruction, deeper redaction pipeline. Photoreal materials has a lean walkthrough MVP (item 13); fuller textured/scanned fidelity remains out of scope.
+Still open vs full north star: real binary OCR (image/PDF), deeper redaction pipeline, scene reconstruction / plan auto-trace, and scanned/photoreal mesh fidelity beyond the parametric PBR materials MVP (item 13).

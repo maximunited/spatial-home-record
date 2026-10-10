@@ -56,12 +56,14 @@ export function CaptureTaskList({
               />
               <label className="grid gap-1">
                 <span className="text-xs text-zinc-500">
-                  Upload IRL photo (stored as phase: current)
+                  Upload IRL photo (stored as phase: current). On phone, use
+                  camera or choose from gallery.
                 </span>
                 <input
                   type="file"
                   name="file"
                   accept="image/*"
+                  capture="environment"
                   required
                   className="text-xs text-zinc-600"
                 />

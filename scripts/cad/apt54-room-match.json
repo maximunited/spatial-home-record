@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "notes": "Apartment 54 / Neve Yehushua — room match + openings for cad:apply-rooms. Coordinates are apartment-local meters after CAD normalize (origin at structural bbox min). Optional overrides: set seed {x,y} and/or bbox {minX,minY,maxX,maxY} per room name (overrides always win). Hallway/Balcony names are optional — if those room entities do not exist, corridor/balcony regions are skipped so they do not steal bedroom/wet slots.",
+  "notes": "Apartment 54 / Neve Yehushua — room match + openings for cad:apply-rooms. Coordinates are apartment-local meters after CAD normalize (origin at structural bbox min). Optional overrides: set seed {x,y} and/or bbox {minX,minY,maxX,maxY} per room name (overrides always win). Import creates Hallway + Balcony room entities so corridor/balcony regions can be claimed; if those names are absent, classified regions are skipped so they do not steal bedroom/wet slots.",
   "partition": {
     "cellSize": 0.15,
     "wallThickness": 0.12,

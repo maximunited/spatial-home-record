@@ -70,7 +70,7 @@ type AssetSpec = {
   primaryPlan?: boolean;
 };
 
-/** Curated pilot set — keep small; expand later via UI uploads. */
+/** Curated pilot set (~36 files) — expand further via UI uploads when needed. */
 const ASSETS: AssetSpec[] = [
   {
     rel: "Apartment plans\\Plan 1 - Full living room.jpg",
@@ -192,6 +192,60 @@ const ASSETS: AssetSpec[] = [
     phase: "construction",
   },
   {
+    rel: "Kitchen\\alter3.jpg",
+    kind: "evidence",
+    type: "photo",
+    summary: "Kitchen alteration photo 3",
+    linkTo: "kitchen",
+    phase: "construction",
+  },
+  {
+    rel: "Apartment plans\\Misc\\2017-07-21 18.17.58.jpg",
+    kind: "evidence",
+    type: "photo",
+    summary: "On-site photo Jul 2017 (construction / handover period)",
+    linkTo: "living",
+    phase: "construction",
+  },
+  {
+    rel: "Apartment plans\\Misc\\2017-08-14 14.50.49.jpg",
+    kind: "evidence",
+    type: "photo",
+    summary: "On-site photo Aug 2017 (construction / handover period)",
+    linkTo: "living",
+    phase: "construction",
+  },
+  {
+    rel: "Apartment plans\\Misc\\2017-08-14 14.51.16.jpg",
+    kind: "evidence",
+    type: "photo",
+    summary: "On-site photo Aug 2017 (construction / handover period)",
+    linkTo: "living",
+    phase: "construction",
+  },
+  {
+    rel: "Apartment plans\\Misc\\2017-08-28 10.14.47.jpg",
+    kind: "evidence",
+    type: "photo",
+    summary: "On-site photo Aug 2017 (construction / handover period)",
+    linkTo: "living",
+    phase: "construction",
+  },
+  {
+    rel: "Apartment plans\\Changes request 19.3.2017\\Kitchen - East wall - מטבח - קיר מזרחי.png",
+    kind: "evidence",
+    type: "plan",
+    summary: "Kitchen east wall elevation (Mar 2017 change request)",
+    linkTo: "kitchen",
+  },
+  {
+    rel: "Apartment plans\\Changes request 19.3.2017\\Kitchen - North wall - מטבח - קיר צפוני.png",
+    kind: "evidence",
+    type: "plan",
+    summary: "Kitchen north wall elevation (Mar 2017 change request)",
+    linkTo: "kitchen",
+  },
+  {
     rel: "Kitchen\\מפרט מטבח - 11.9.2016.pdf",
     kind: "document",
     type: "manual",
@@ -206,6 +260,70 @@ const ASSETS: AssetSpec[] = [
     summary: "Receipt — counter + cladding 11.11.2016",
     linkTo: "kitchen",
     merchant: "Kitchen counter/cladding",
+  },
+  {
+    rel: "Kitchen\\קבלה - תוספת לחיפוי.pdf",
+    kind: "document",
+    type: "receipt",
+    summary: "Receipt — cladding addition (kitchen)",
+    linkTo: "kitchen",
+    merchant: "Kitchen cladding",
+  },
+  {
+    rel: "Kitchen\\מטבח תכניות חשמל.pdf",
+    kind: "document",
+    type: "manual",
+    summary: "Kitchen electrical plans",
+    linkTo: "kitchen",
+    merchant: "Kitchen electrical",
+  },
+  {
+    rel: "Kitchen\\תוכניות מטבח חשמל - מיטל.pdf",
+    kind: "document",
+    type: "manual",
+    summary: "Kitchen electrical plans (Meital)",
+    linkTo: "kitchen",
+    merchant: "Kitchen electrical",
+  },
+  {
+    rel: "Kitchen\\Countertops\\הזמנה - גטניו - 18.12.2016\\יוניק אלפא דירה 54 - 19477.pdf",
+    kind: "document",
+    type: "invoice",
+    summary: "Gatnio countertop order — Unique Alpha Apt 54 (18.12.2016)",
+    linkTo: "kitchen",
+    merchant: "Gatnio / Unique Alpha",
+  },
+  {
+    rel: "Kitchen\\Countertops\\הזמנה - גטניו - 18.12.2016\\קבלה.pdf",
+    kind: "document",
+    type: "receipt",
+    summary: "Gatnio countertop receipt (18.12.2016 order)",
+    linkTo: "kitchen",
+    merchant: "Gatnio",
+  },
+  {
+    rel: "Kitchen\\Bluran\\טופס מדידה - 9.3.2017.pdf",
+    kind: "document",
+    type: "other",
+    summary: "Bluran kitchen measurement form 9.3.2017",
+    linkTo: "kitchen",
+    merchant: "Bluran",
+  },
+  {
+    rel: "Kitchen\\Bluran\\טופס מדידה שניה - 20.7.2017.pdf",
+    kind: "document",
+    type: "other",
+    summary: "Bluran kitchen second measurement form 20.7.2017",
+    linkTo: "kitchen",
+    merchant: "Bluran",
+  },
+  {
+    rel: "Kitchen Backsplash\\בלורן - הצעה - 25.9.2016.pdf",
+    kind: "document",
+    type: "other",
+    summary: "Bluran backsplash quote 25.9.2016",
+    linkTo: "kitchen",
+    merchant: "Bluran",
   },
   {
     rel: "Doors\\Pandoor\\פנדור הזמנה - 13.10.2016.pdf",
@@ -494,6 +612,22 @@ async function main() {
     category: "closet",
     name: "Walk-in Closet",
   });
+  // Optional CAD regions — created so cad:apply-rooms can claim corridor/balcony
+  // instead of skipping them (see scripts/cad/apt54-room-match.json).
+  const hallway = await insertEntity({
+    projectId: project.id,
+    parentId: floor.id,
+    type: "room",
+    category: "hallway",
+    name: "Hallway",
+  });
+  const balcony = await insertEntity({
+    projectId: project.id,
+    parentId: floor.id,
+    type: "room",
+    category: "balcony",
+    name: "Balcony",
+  });
 
   // Stub media wall only when CAD walls are not about to replace Living Room walls.
   let mediaWall: { id: string } | null = null;
@@ -540,6 +674,8 @@ async function main() {
     bedroom3,
     bath,
     closet,
+    hallway,
+    balcony,
     ...(mediaWall ? { mediaWall } : {}),
     floorTiles,
   };
@@ -729,6 +865,8 @@ async function main() {
     bedroom3,
     bath,
     closet,
+    hallway,
+    balcony,
   ];
   const roomByName = new Map(
     roomEntities.map((r) => [r.name.toLowerCase(), r] as const),

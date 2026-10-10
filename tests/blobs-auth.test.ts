@@ -193,6 +193,8 @@ describe("apt54 current photo capture specs", () => {
   it("builds overview + wall tasks for each room", () => {
     const specs = buildApt54CurrentPhotoCaptureSpecs();
     expect(specs).toHaveLength(APT54_ROOM_NAMES.length * 2);
+    expect(APT54_ROOM_NAMES).toContain("Hallway");
+    expect(APT54_ROOM_NAMES).toContain("Balcony");
     expect(specs.every((s) => s.instruction.toLowerCase().includes("real"))).toBe(
       true,
     );
@@ -203,5 +205,9 @@ describe("apt54 current photo capture specs", () => {
     ]);
     expect(captureTaskMetadata(living[0]).phase).toBe("current");
     expect(captureTaskMetadata(living[0]).requires_irl).toBe(true);
+    const hallway = specs.find((s) => s.taskKey === "apt54-current-overview-hallway");
+    expect(hallway?.instruction.toLowerCase()).toContain("corridor");
+    const balcony = specs.find((s) => s.taskKey === "apt54-current-overview-balcony");
+    expect(balcony?.instruction.toLowerCase()).toContain("railing");
   });
 });

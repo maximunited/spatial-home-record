@@ -27,8 +27,9 @@ export default async function CapturePage({
         </p>
         <div className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           This app cannot take photos for you. Shoot in the apartment with your
-          phone, then upload here. Guide:{" "}
-          <code className="text-xs">docs/CURRENT-PHOTOS.md</code>.
+          phone, then upload here (rear camera preferred on mobile). Guide:{" "}
+          <code className="text-xs">docs/CURRENT-PHOTOS.md</code>. Archive
+          construction shots are not a substitute for open checklist tasks.
         </div>
         <CaptureTaskList projectId={id} tasks={tasks} />
       </div>

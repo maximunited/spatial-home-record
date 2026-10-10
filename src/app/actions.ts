@@ -849,7 +849,8 @@ export async function completeCaptureTaskAction(formData: FormData) {
     revalidatePath(`/projects/${projectId}/walls/${task.entityId}`);
     revalidatePath(`/projects/${projectId}/entities/${task.entityId}`);
   }
-  if (returnTo) revalidatePath(returnTo);
+  // Always navigate back so the checklist re-renders with the completed task.
+  redirect(returnTo || `/projects/${projectId}/capture`);
 }
 
 function revalidateProjectPaths(

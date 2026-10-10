@@ -10,7 +10,9 @@ Default path (override with `APT54_SOURCE`):
 
 ## What gets imported
 
-Curated subset (~21 files): living-room / apartment plans, electrical + network sketches, a few 2017–2018 site photos, kitchen photos + specs/receipts, ceramics invoice, door order, handover protocol.
+Curated subset (~36 files): living-room / apartment plans, electrical + network sketches, additional 2017–2018 site photos, kitchen photos + elevations + specs/receipts/countertop order + Bluran measurement/backsplash docs, ceramics invoice, door order, handover protocol.
+
+Rooms created: Living Room, Kitchen, Master Bedroom, Bedroom 2, Bedroom 3, Bathroom, Walk-in Closet, **Hallway**, **Balcony** (the last two exist so `cad:apply-rooms` and current-photo capture can target corridor/balcony regions).
 
 Plan 1 (`Plan 1 - Full living room.jpg`) is tagged `metadata.role = primary_plan` and pre-linked as the Living Room `plan_underlay` attribute (opacity/scale/offset defaults, confidence **estimated**).
 
@@ -58,16 +60,39 @@ Re-running deletes and recreates the project named **Apartment 54 / Neve Yehushu
 
 Local uploads require Clerk **or** `ALLOW_UNAUTHENTICATED_UPLOADS=1` (see `.env.example`).
 
-## Calibrate Living Room from Plan 1
+## Calibrate rooms (per-room guidance)
+
+### Living Room (Plan 1 / CAD underlay)
 
 1. After import, open the project (home → **Apartment 54 / Neve Yehushua 15**), or follow `calibratePath` printed by the import script.
-2. Use **Calibrate Living Room from Plan 1** (deep-links `?evidence=` to Plan 1).
+2. Use **Calibrate Living Room from Plan 1** (deep-links `?evidence=` to Plan 1), or pick the CAD underlay if `APT54_CAD_PRIMARY=1`.
 3. In the geometry editor:
    - Plan image appears as an underlay behind the SVG walls.
    - Adjust **opacity**, **scale**, and **offset X/Y** (meters) until walls match the drawing.
    - **Save underlay alignment** — stores `plan_underlay` on the room (measured vs estimated confidence).
    - Edit **width / depth / ceiling** and wall endpoints; mark **measured** when taped, leave **estimated** for stubs.
 4. Existing imports without `role: primary_plan` still resolve Plan 1 via summary text (`Plan 1` / `primary calibration`).
+
+### Other rooms after `cad:apply-rooms`
+
+Run `APT54_APPLY_ROOMS=1 npm run import:apt54` (or `npm run cad:apply-rooms`) so each room gets its own `plan_wall` set in room-local meters. Then calibrate room-by-room:
+
+| Room | Underlay / evidence | What to measure |
+| ---- | ------------------- | --------------- |
+| Living Room | Plan 1 JPG and/or CAD SVG (primary) | Envelope + media wall; tape width/depth/ceiling |
+| Kitchen | Kitchen east/north wall elevations + drywall/electrical change plans; kitchen docs on entity | Counter run length, ceiling; align walls to CAD split |
+| Bedrooms | CAD per-room walls only (no dedicated plan JPG in curated set) | Tape width/depth; mark measured when taped |
+| Bathroom | CAD wet region | Wet walls + ceiling; expect estimated openings |
+| Walk-in Closet | Closet measurement JPG (`מידות חדר ארונות`) | Match tape sketch to wall lengths |
+| Hallway | CAD corridor region (when matched) | Corridor length + width; door openings |
+| Balcony | CAD exterior-edge region (when matched) | Depth to railing + width; privacy in photos |
+
+Tips:
+
+- Living Room underlay scale/offset does **not** auto-copy to other rooms — each room’s `plan_underlay` is independent (usually unset until you attach evidence).
+- Prefer CAD walls (`supported`) over the import stub media wall; re-import with `APT54_APPLY_ROOMS=1` replaces stubs for matched rooms.
+- Confidence: **measured** only when you taped or verified on site; leave **estimated** for CAD heuristics and brochure dims.
+- Deep links: project hub prefers Living Room by name after re-import (`findCalibrationRoom`); open other rooms from the room list.
 
 ## CAD workflow (DWG → SVG underlay)
 
@@ -168,10 +193,21 @@ Limits: not full BIM; door/window CAD is fragment-based (swing arcs / sill ticks
 
 Export DXF from AutoCAD/TrueView → drop into `public/imports/cad-apt54/` → `npm run cad:dxf -- --apt54`. Keep using Plan 1 JPG as underlay until then.
 
+## Kitchen / product docs
+
+Import attaches Kitchen entity documents when present on `APT54_SOURCE`:
+
+- Spec `מפרט מטבח - 11.9.2016.pdf`, counter/cladding receipts, cladding-addition receipt
+- Kitchen electrical plan PDFs
+- Gatnio/Unique Alpha countertop order + receipt (`Kitchen/Countertops/...`)
+- Bluran measurement forms + backsplash quote (`Kitchen/Bluran/`, `Kitchen Backsplash/`)
+
+Still **not** auto-imported (attach via Documents UI when needed): competing countertop quotes under `Kitchen/Countertops/` (Gatnio/Mizrahi הצעות מחיר), Payments/, sale/tax PII, and any file outside the curated `ASSETS` list in `scripts/import-apartment-54.ts`.
+
 ## Next steps after import
 
-1. Run `npm run cad:apply-rooms` (or re-import with `APT54_APPLY_ROOMS=1`), then calibrate each room (tape dims + underlay alignment on Living).
-2. Shoot fresh **current** photos IRL and complete capture tasks — see [CURRENT-PHOTOS.md](CURRENT-PHOTOS.md) (`/projects/{id}/capture`, or `npm run seed:apt54-capture` if tasks are missing).
+1. Run `npm run cad:apply-rooms` (or re-import with `APT54_APPLY_ROOMS=1`), then calibrate each room ([per-room guidance](#calibrate-rooms-per-room-guidance)).
+2. Shoot fresh **current** photos IRL and complete capture tasks — see [CURRENT-PHOTOS.md](CURRENT-PHOTOS.md) (`/projects/{id}/capture`, or `npm run seed:apt54-capture` if tasks are missing). Archive 2018 shots are not a full current pass.
 3. Link more construction vs current photos to walls for compare UI.
-4. Attach remaining product docs (kitchen countertops, inspections defects) via Documents on entities.
+4. Attach any remaining product quotes/inspections defects via Documents on entities (see [Kitchen / product docs](#kitchen--product-docs)).
 5. Tune `scripts/cad/apt54-room-match.json` overrides if a room mismatch shows up.

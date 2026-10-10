@@ -38,14 +38,14 @@ Integration tests use `describe.runIf(Boolean(process.env.DATABASE_URL))`, so th
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
 1. **unit** — `lint`, `typecheck`, `test:unit`, `build`
-2. **integration** — Postgres 16 service, apply `drizzle/0000_init_spatial_schema.sql` + `drizzle/0001_share_links.sql`, `test:integration`
+2. **integration** — Postgres 16 service, `npm run db:migrate`, `test:integration`
 
 ## Local integration setup
 
 ```bash
 cp .env.example .env
 # set DATABASE_URL
-npx drizzle-kit push
+npm run db:migrate
 npm run test:integration
 ```
 

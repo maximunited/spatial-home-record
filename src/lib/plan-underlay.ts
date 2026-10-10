@@ -3,7 +3,7 @@
  * Pure helpers — DB attributes remain source of truth.
  */
 
-import { blobPublicUrl } from "@/lib/blobs";
+import { blobPublicUrl } from "@/lib/blob-urls";
 import type { ConfidenceState } from "@/lib/confidence";
 import {
   planToSvg,

@@ -1,0 +1,3 @@
+# Keep migration SQL/meta hashes stable across Windows/macOS/Linux checkouts.
+drizzle/**/*.sql text eol=lf
+drizzle/meta/** text eol=lf

@@ -8,15 +8,56 @@ Copy `.env.example` → `.env` and set a Postgres URL. Without it:
 - Integration tests are skipped
 - Seed (`npm run seed`) fails
 
-## `drizzle-kit push` hangs or asks questions
+## `Can't resolve 'tls'` / `perf_hooks` during `npm run build`
 
-Prefer applying the checked-in SQL once:
+`postgres` is Node-only. Client Components must not import `@/db/client`, `@/lib/documents`, `@/lib/blobs`, `@/lib/projects`, or `@/lib/share-links`.
+
+Use the client-safe modules instead:
+
+| Need | Import from |
+| ---- | ----------- |
+| Document types / labels | `@/lib/document-types` |
+| Blob public URLs / key helpers | `@/lib/blob-urls` |
+| Share link active check | `@/lib/share-link-status` |
+
+CI runs `npm run build` with `DATABASE_URL=""` on purpose — the build must succeed without a live database.
+
+## Database migrations
+
+**One path:** `npm run db:migrate` (`scripts/db-migrate.ts`).
+
+It applies journaled SQL under `drizzle/` and records success in `drizzle.__drizzle_migrations`. Do not use `psql -f` or `drizzle-kit push` for normal setup — `push` often hangs / prompts, and raw `psql` skips the journal so the next migrate tries to recreate tables.
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f drizzle/0000_init_spatial_schema.sql
+npm run db:migrate
 ```
 
-Or use `npx drizzle-kit push` against an empty database.
+| Situation | What happens |
+| --------- | ------------ |
+| Empty database | Applies `0000_…` then `0001_…` |
+| Tables exist, no `__drizzle_migrations` (old Neon / `psql` bootstrap) | Baselines matching migrations from probe tables (`projects`, `share_links`), then applies only missing ones |
+| Already migrated | No-op |
+
+New schema changes: edit `src/db/schema.ts` → `npm run db:generate` → commit SQL + `drizzle/meta/*` → `npm run db:migrate`.
+
+### Manual journal backfill (rare)
+
+If you must mark migrations applied without running SQL (schema already correct), insert rows using each file’s SHA-256 and the journal `when` from `drizzle/meta/_journal.json` (not “now” — a later timestamp can silently skip pending migrations):
+
+```sql
+CREATE SCHEMA IF NOT EXISTS drizzle;
+CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
+  id SERIAL PRIMARY KEY,
+  hash text NOT NULL,
+  created_at bigint
+);
+-- hash = sha256 of the exact contents of drizzle/<tag>.sql
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES
+  ('<sha256 of 0000_init_spatial_schema.sql>', 1791307317046),
+  ('<sha256 of 0001_share_links.sql>', 1791460000000);
+```
+
+Prefer `npm run db:migrate` — it does this baseline automatically when `projects` exists and the journal table is empty.
 
 ## Cross-project parent errors
 

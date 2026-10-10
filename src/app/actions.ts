@@ -13,6 +13,7 @@ import {
   createDocument,
   isDocumentType,
   linkDocumentToEntities,
+  setDocumentRedactedBlob,
 } from "@/lib/documents";
 import {
   createMeasurement,
@@ -698,6 +699,50 @@ export async function updateMeasurementAction(formData: FormData) {
     value: valueRaw,
     units: unitsRaw,
     confidence,
+  });
+
+  revalidateProjectPaths(projectId, entityId, returnTo);
+}
+
+/**
+ * Manually upload a redacted file for an existing document.
+ * Sets documents.redacted_blob_id; share links may serve that blob.
+ */
+export async function attachRedactedDocumentBlobAction(formData: FormData) {
+  requireDb();
+  const projectId = String(formData.get("projectId") ?? "");
+  const entityId = String(formData.get("entityId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "");
+
+  if (!projectId || !entityId || !documentId) {
+    throw new Error("Missing projectId, entityId, or documentId");
+  }
+
+  const bundle = await getEntityBundle(entityId, { projectId });
+  if (!bundle) throw new Error("Entity not found in project");
+  if (!bundle.documents.some((d) => d.id === documentId)) {
+    throw new Error("Document is not linked to this entity");
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Redacted file is required");
+  }
+
+  await requireUploadAuth();
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const blob = await writeLocalBlob({
+    projectId,
+    filename: file.name || "redacted.bin",
+    bytes,
+    contentType: file.type || null,
+  });
+
+  await setDocumentRedactedBlob({
+    documentId,
+    projectId,
+    redactedBlobId: blob.id,
   });
 
   revalidateProjectPaths(projectId, entityId, returnTo);

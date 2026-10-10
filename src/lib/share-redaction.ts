@@ -3,7 +3,7 @@
  * Documents / receipts / payment-like payloads are never shareable.
  */
 
-import { blobPublicUrl } from "@/lib/blobs";
+import { blobPublicUrl } from "@/lib/blob-urls";
 import type { ShareLayerFlags } from "@/db/schema";
 import { DEFAULT_SHARE_LAYERS } from "@/db/schema";
 
@@ -97,15 +97,24 @@ export function isPaymentDocumentType(documentType: string): boolean {
 
 /**
  * Evidence is share-safe when it is a plan/underlay or walkthrough photo —
- * never a document blob, and never tagged as payment/receipt in metadata.
+ * never a document original, and never tagged as payment/receipt in metadata.
+ * An owner-uploaded redacted blob (`redactedStorageKey`) opts the asset into
+ * share-safe access even when the original key/metadata looks document-linked.
  */
 export function isShareSafeEvidence(evidence: {
   type: string;
   metadata?: Record<string, unknown> | null;
   storageKey?: string | null;
+  redactedStorageKey?: string | null;
 }): boolean {
   const meta = evidence.metadata ?? {};
   if (meta.share_safe === false) return false;
+
+  // Explicit redacted copy: owner opted this asset into share serving.
+  if (evidence.redactedStorageKey) {
+    return true;
+  }
+
   if (meta.contains_payment === true || meta.receipt === true) return false;
   if (typeof meta.document_type === "string" && isPaymentDocumentType(meta.document_type)) {
     return false;
@@ -145,6 +154,7 @@ export function filterShareSafeWalkthroughEvidence<
     type: string;
     metadata?: Record<string, unknown> | null;
     storageKey?: string | null;
+    redactedStorageKey?: string | null;
   },
 >(rows: readonly T[]): T[] {
   return rows.filter((e) =>
@@ -152,6 +162,7 @@ export function filterShareSafeWalkthroughEvidence<
       type: e.type,
       metadata: e.metadata ?? null,
       storageKey: e.storageKey ?? null,
+      redactedStorageKey: e.redactedStorageKey ?? null,
     }),
   );
 }

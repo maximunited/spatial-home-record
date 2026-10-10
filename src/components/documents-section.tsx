@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   attachDocumentAction,
+  attachRedactedDocumentBlobAction,
   linkExistingDocumentAction,
 } from "@/app/actions";
 import { OcrEvidenceAssist } from "@/components/ocr-evidence-assist";
@@ -10,7 +11,7 @@ import {
   DOCUMENT_TYPES,
   formatDocumentLabel,
   type EntityDocument,
-} from "@/lib/documents";
+} from "@/lib/document-types";
 
 export function DocumentsSection({
   projectId,
@@ -67,21 +68,60 @@ export function DocumentsSection({
                         : null}
                     </div>
                   </div>
-                  {doc.publicUrl ? (
-                    <a
-                      href={doc.publicUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 text-xs text-sky-700 underline"
-                    >
-                      Open
-                    </a>
-                  ) : (
-                    <span className="shrink-0 text-xs text-zinc-400">
-                      No file
-                    </span>
-                  )}
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {doc.publicUrl ? (
+                      <a
+                        href={doc.publicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-sky-700 underline"
+                      >
+                        Open original
+                      </a>
+                    ) : (
+                      <span className="text-xs text-zinc-400">No file</span>
+                    )}
+                    {doc.redactedPublicUrl ? (
+                      <a
+                        href={doc.redactedPublicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-sky-700 underline"
+                      >
+                        Open redacted
+                      </a>
+                    ) : (
+                      <span className="text-xs text-zinc-400">No redacted</span>
+                    )}
+                  </div>
                 </div>
+                <form
+                  action={attachRedactedDocumentBlobAction}
+                  encType="multipart/form-data"
+                  className="mt-2 flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-2 text-xs"
+                >
+                  <input type="hidden" name="projectId" value={projectId} />
+                  <input type="hidden" name="entityId" value={entityId} />
+                  <input type="hidden" name="documentId" value={doc.id} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <label className="grid min-w-[12rem] flex-1 gap-1">
+                    <span className="text-zinc-500">
+                      Redacted file (manual upload for share-safe access)
+                    </span>
+                    <input
+                      type="file"
+                      name="file"
+                      required
+                      className="text-zinc-600"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="rounded border border-zinc-300 bg-white px-2 py-1 hover:bg-zinc-50"
+                  >
+                    {doc.redactedPublicUrl ? "Replace redacted" : "Upload redacted"}
+                  </button>
+                </form>
               </li>
             ))}
           </ul>

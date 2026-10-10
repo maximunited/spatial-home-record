@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDocumentLabel, isDocumentType } from "@/lib/documents";
+import { formatDocumentLabel, isDocumentType } from "@/lib/document-types";
 import {
   formatMeasurementLabel,
   isMeasurementUnit,

@@ -1,4 +1,4 @@
-import { blobPublicUrl } from "@/lib/blobs";
+import { blobPublicUrl } from "@/lib/blob-urls";
 
 export type PhotoEvidenceRow = {
   id: string;

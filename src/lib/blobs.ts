@@ -3,6 +3,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getDb } from "@/db/client";
 import { blobs } from "@/db/schema";
+import { cleanStorageKey } from "@/lib/blob-urls";
+
+export {
+  blobPublicUrl,
+  cleanStorageKey,
+  isPrivateUploadKey,
+  isPublicSeedKey,
+} from "@/lib/blob-urls";
 
 /** Committed seed assets under Next `public/` (world-readable). */
 export const PUBLIC_DIR = path.join(process.cwd(), "public");
@@ -19,36 +27,10 @@ export const DATA_DIR = path.join(process.cwd(), ".data");
  * - User uploads: `.data/uploads/{projectId}/...` → storageKey `uploads/{projectId}/...`
  *   → URL `/api/blobs/uploads/...` (auth-gated)
  * Swap `writeLocalBlob` for S3 later; keep `blobs.storage_key` as the portable pointer.
+ *
+ * Client-safe URL helpers live in `@/lib/blob-urls` — do not import this module
+ * from Client Components (it pulls in postgres via `@/db/client`).
  */
-
-/** Normalize and reject path traversal in storage keys. */
-export function cleanStorageKey(storageKey: string): string {
-  const cleaned = storageKey.replace(/^\/+/, "").replace(/\\/g, "/");
-  if (!cleaned || cleaned.includes("..") || path.isAbsolute(cleaned)) {
-    throw new Error("Invalid storage key");
-  }
-  return cleaned;
-}
-
-export function isPrivateUploadKey(storageKey: string): boolean {
-  return cleanStorageKey(storageKey).startsWith("uploads/");
-}
-
-export function isPublicSeedKey(storageKey: string): boolean {
-  return cleanStorageKey(storageKey).startsWith("seed/");
-}
-
-/**
- * Browser URL for a blob. Seed assets stay static; user uploads go through
- * the authenticated `/api/blobs/…` route (cookies / Clerk session).
- */
-export function blobPublicUrl(storageKey: string): string {
-  const cleaned = cleanStorageKey(storageKey);
-  if (cleaned.startsWith("seed/")) {
-    return `/${cleaned}`;
-  }
-  return `/api/blobs/${cleaned}`;
-}
 
 /** Absolute filesystem path for a storage key. */
 export function localBlobAbsolutePath(storageKey: string): string {

@@ -10,7 +10,7 @@ import {
   DOCUMENT_TYPES,
   formatDocumentLabel,
   type EntityDocument,
-} from "@/lib/documents";
+} from "@/lib/document-types";
 
 export function DocumentsSection({
   projectId,

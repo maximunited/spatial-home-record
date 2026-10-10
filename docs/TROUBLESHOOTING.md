@@ -8,6 +8,20 @@ Copy `.env.example` → `.env` and set a Postgres URL. Without it:
 - Integration tests are skipped
 - Seed (`npm run seed`) fails
 
+## `Can't resolve 'tls'` / `perf_hooks` during `npm run build`
+
+`postgres` is Node-only. Client Components must not import `@/db/client`, `@/lib/documents`, `@/lib/blobs`, `@/lib/projects`, or `@/lib/share-links`.
+
+Use the client-safe modules instead:
+
+| Need | Import from |
+| ---- | ----------- |
+| Document types / labels | `@/lib/document-types` |
+| Blob public URLs / key helpers | `@/lib/blob-urls` |
+| Share link active check | `@/lib/share-link-status` |
+
+CI runs `npm run build` with `DATABASE_URL=""` on purpose — the build must succeed without a live database.
+
 ## Database migrations
 
 **One path:** `npm run db:migrate` (`scripts/db-migrate.ts`).

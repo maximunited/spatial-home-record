@@ -3,7 +3,7 @@ import {
   revokeShareLinkAction,
 } from "@/app/actions";
 import type { ShareLayerFlags } from "@/db/schema";
-import { isShareLinkActive } from "@/lib/share-links";
+import { isShareLinkActive } from "@/lib/share-link-status";
 
 type ShareLinkRow = {
   id: string;

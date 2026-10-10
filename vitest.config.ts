@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Next enforces server-only in client bundles; Vitest runs in Node.
+      "server-only": path.resolve(__dirname, "./tests/empty-server-only.ts"),
     },
   },
 });

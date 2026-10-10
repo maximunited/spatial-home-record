@@ -3,7 +3,7 @@
  * Documents / receipts / payment-like payloads are never shareable.
  */
 
-import { blobPublicUrl } from "@/lib/blobs";
+import { blobPublicUrl } from "@/lib/blob-urls";
 import type { ShareLayerFlags } from "@/db/schema";
 import { DEFAULT_SHARE_LAYERS } from "@/db/schema";
 

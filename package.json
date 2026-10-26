@@ -26,17 +26,17 @@
     "cad:apply-rooms": "tsx scripts/apply-cad-rooms.ts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^7.9.11",
+    "@clerk/nextjs": "^7.9.19",
     "@react-three/drei": "^10.7.9",
-    "@react-three/fiber": "^9.8.1",
-    "drizzle-orm": "^0.45.3",
-    "next": "16.3.8",
+    "@react-three/fiber": "^9.8.2",
+    "drizzle-orm": "^0.45.4",
+    "next": "16.4.2",
     "postgres": "^3.4.9",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "server-only": "^0.0.1",
     "three": "^0.186.1",
-    "uuid": "^14.0.2"
+    "uuid": "^14.0.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -46,13 +46,13 @@
     "@types/three": "^0.186.0",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "dotenv": "^18.0.5",
+    "dotenv": "^18.0.9",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^7",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   }
 }
